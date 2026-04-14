@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
+import { logger } from "../../lib/logger";
+import { operationalMetricsService } from "../metrics/operational-metrics.service";
 
 type AuditScopeType = "EXPEDIENTE" | "ETAPA" | "SISTEMA";
 
@@ -72,8 +74,15 @@ export const auditService = {
     try {
       await this.log(input);
     } catch (error) {
-      // No romper flujo funcional por falla de auditoría en etapa MVP.
-      console.error("Audit log error:", error);
+      operationalMetricsService.recordAuditLogFailure();
+      // No romper flujo funcional por falla de auditoria en etapa MVP.
+      logger.error("audit.log.failed_non_blocking", "Audit log failed in non-blocking mode.", error, {
+        accion: input.accion,
+        userId: input.usuarioId ?? null,
+        expedienteId: input.expedienteId ?? null,
+        scopeType: input.scopeType ?? null,
+        scopeId: input.scopeId ?? null
+      });
     }
   }
 };

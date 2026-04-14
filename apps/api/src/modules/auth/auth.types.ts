@@ -5,6 +5,8 @@ export type LoginInput = {
 
 export type RefreshInput = {
   refreshToken: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
 };
 
 export type JwtTokenPayload = {
@@ -16,11 +18,26 @@ export type JwtTokenPayload = {
   exp?: number;
 };
 
+export type RefreshJwtTokenPayload = {
+  sub: string;
+  jti: string;
+  family: string;
+  type: "refresh";
+  iat?: number;
+  exp?: number;
+};
+
 export type AuthTokens = {
   accessToken: string;
   refreshToken: string;
   tokenType: "Bearer";
   expiresIn: string;
+};
+
+export type IssuedRefreshToken = {
+  token: string;
+  payload: RefreshJwtTokenPayload;
+  expiresAt: Date;
 };
 
 export type AuthUserProfile = {

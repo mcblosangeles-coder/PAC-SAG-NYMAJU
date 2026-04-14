@@ -28,7 +28,12 @@ authRouter.post("/login", async (req, res) => {
       return sendApiError(res, 400, API_ERROR_CODE.invalidPayload, "Payload invalido.");
     }
 
-    const result = await authService.login({ email, password });
+    const result = await authService.login({
+      email,
+      password,
+      ipAddress: req.ip,
+      userAgent: bodyString(req.header("user-agent") ?? "")
+    });
     return res.status(200).json(result);
   } catch (error) {
     if (error instanceof AuthError) {
@@ -45,7 +50,11 @@ authRouter.post("/refresh", async (req, res) => {
       return sendApiError(res, 400, API_ERROR_CODE.invalidPayload, "Payload invalido.");
     }
 
-    const tokens = await authService.refresh({ refreshToken });
+    const tokens = await authService.refresh({
+      refreshToken,
+      ipAddress: req.ip,
+      userAgent: bodyString(req.header("user-agent") ?? "")
+    });
     return res.status(200).json(tokens);
   } catch (error) {
     if (error instanceof AuthError) {
@@ -55,9 +64,20 @@ authRouter.post("/refresh", async (req, res) => {
   }
 });
 
-authRouter.post("/logout", async (_req, res) => {
-  await authService.logout();
-  return res.status(204).send();
+authRouter.post("/logout", async (req, res) => {
+  try {
+    const refreshToken = bodyString(req.body?.refreshToken);
+    await authService.logout({
+      refreshToken,
+      ipAddress: req.ip
+    });
+    return res.status(204).send();
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return sendApiError(res, error.statusCode, API_ERROR_CODE.unauthenticated, error.message);
+    }
+    return sendApiError(res, 500, API_ERROR_CODE.internalError, "Error interno en logout.");
+  }
 });
 
 authRouter.get("/me", async (req, res) => {
