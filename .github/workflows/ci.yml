@@ -1,7 +1,6 @@
-```yaml
-name: CI Quality Gates
+﻿name: CI Quality Gates
 
-on:
+'on':
   pull_request:
     branches:
       - main
@@ -38,6 +37,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
+
     env:
       DATABASE_URL: postgresql://pac_user:pac_password@localhost:5432/pac_nymaju_spr?schema=public
       REDIS_URL: redis://localhost:6379
@@ -46,6 +46,7 @@ jobs:
       API_PREFIX: /api/v1
       CORS_ORIGIN: http://localhost:5173
       NODE_ENV: test
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,4 +74,3 @@ jobs:
 
       - name: Run quality gates
         run: pnpm preflight:ci
-```
