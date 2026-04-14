@@ -844,3 +844,24 @@ Fecha cierre: 2026-04-14
 
 Resultado de cierre:
 - M3-E5 VALIDADO Y CERRADO FORMALMENTE.
+
+## Paquete de release MacroFase 3
+
+Fecha release: 2026-04-14
+
+1. Commit de consolidacion:
+- `1d43237` - `M3 release: close E5 UI/API E2E, docs, observability and session hardening`.
+
+2. Push remoto:
+- `origin/main` actualizado desde `aa529d3` a `1d43237`.
+
+3. Evidencia tecnica de cierre:
+- `pnpm.cmd preflight:ci` -> OK (API typecheck + unit + e2e).
+- `pnpm.cmd --filter @pac/web typecheck` -> OK.
+- `pnpm.cmd --filter @pac/web build` -> OK.
+
+4. Estado repositorio post-release:
+- working tree limpio.
+
+Estado final MacroFase 3 (alcance implementado hasta M3-E5):
+- RELEASE PREPARADO Y PUBLICADO EN REPOSITORIO REMOTO.
