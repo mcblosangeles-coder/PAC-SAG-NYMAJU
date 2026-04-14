@@ -96,6 +96,7 @@ export const createApp = (): express.Express => {
       res: express.Response,
       _next: express.NextFunction
     ) => {
+      void _next;
       logger.error("http.request.failed", "Unhandled API error.", err, {
         requestId: res.locals.requestId,
         method: req.method,

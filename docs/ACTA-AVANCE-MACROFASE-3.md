@@ -870,3 +870,19 @@ Fecha release: 2026-04-14
 
 Estado final MacroFase 3 (alcance implementado hasta M3-E5):
 - RELEASE PREPARADO Y PUBLICADO EN REPOSITORIO REMOTO.
+
+## Hardening post-release - cierre de brecha lint ESLint v9
+
+Fecha cierre: 2026-04-14
+
+1. Accion aplicada:
+- se incorpora configuracion flat global `eslint.config.mjs` para monorepo (ESLint v9).
+- ajustes menores en codigo para resolver `no-unused-vars` y referencias de comentarios a reglas no disponibles.
+
+2. Evidencia de cierre:
+- `pnpm.cmd lint` -> OK (turbo lint en verde).
+- `pnpm.cmd preflight:ci` -> OK.
+- `pnpm.cmd --filter @pac/web build` -> OK.
+
+Resultado:
+- brecha de lint global cerrada.

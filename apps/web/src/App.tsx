@@ -281,13 +281,11 @@ function App() {
 
   useEffect(() => {
     void loadDashboard(token);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!data) return;
     void loadTimeline(token);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timelinePage, timelineRuleFilter]);
 
   useEffect(() => {

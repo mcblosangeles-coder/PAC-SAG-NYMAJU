@@ -1,4 +1,4 @@
-import type { OperationalAlertActionType, OperationalAlertEventType, Prisma } from "@prisma/client";
+import type { OperationalAlertEventType, Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { env } from "../../lib/env";
 import { logger } from "../../lib/logger";
@@ -132,8 +132,6 @@ const normalizeText = (value: string | null | undefined): string | null => {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
 };
-
-const isRuleId = (value: string): value is RuleId => rules.some((rule) => rule.id === value);
 
 const getRuleOrThrow = (ruleId: string): OperationalAlertRule => {
   const target = rules.find((rule) => rule.id === ruleId);
