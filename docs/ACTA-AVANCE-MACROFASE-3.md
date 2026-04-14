@@ -863,5 +863,10 @@ Fecha release: 2026-04-14
 4. Estado repositorio post-release:
 - working tree limpio.
 
+5. Brecha tecnica detectada (post-check release):
+- `pnpm.cmd lint` falla en `@pac/shared-utils`, `@pac/shared-types` y `@pac/web` por migracion pendiente a formato `eslint.config.*` (ESLint v9).
+- impacto: no bloquea runtime ni pruebas funcionales, pero bloquea quality gate de lint global.
+- accion recomendada siguiente: normalizar estrategia ESLint (flat config o downgrade controlado) y reactivar gate de lint en CI.
+
 Estado final MacroFase 3 (alcance implementado hasta M3-E5):
 - RELEASE PREPARADO Y PUBLICADO EN REPOSITORIO REMOTO.
