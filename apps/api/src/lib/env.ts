@@ -2,6 +2,7 @@ type AppEnv = {
   nodeEnv: "development" | "test" | "production";
   port: number;
   trustProxy: boolean;
+  trustedProxyCidrs: string[];
   apiPrefix: string;
   corsAllowedOrigins: string[];
   metricsToken: string | null;
@@ -13,6 +14,8 @@ type AppEnv = {
   alertsNotificationCooldownSeconds: number;
   alertsNotifyChannels: Array<"log" | "audit">;
   rateLimitEnabled: boolean;
+  rateLimitStore: "memory" | "redis";
+  rateLimitRequireRedis: boolean;
   rateLimitWindowSeconds: number;
   rateLimitAuthLoginMax: number;
   rateLimitAuthRefreshMax: number;
@@ -100,6 +103,13 @@ const validateApiPrefix = (value: string | undefined): string => {
   return prefix;
 };
 
+const parseRateLimitStore = (rawValue: string | undefined): "memory" | "redis" => {
+  const normalized = rawValue?.trim().toLowerCase();
+  if (!normalized || normalized.length === 0) return "redis";
+  if (normalized === "memory" || normalized === "redis") return normalized;
+  throw new Error(`Invalid RATE_LIMIT_STORE value: ${rawValue}`);
+};
+
 const resolveCorsAllowedOrigins = (
   nodeEnv: AppEnv["nodeEnv"],
   corsAllowedOriginsRaw: string | undefined,
@@ -156,15 +166,27 @@ const validateJwtSecret = (
 
 const nodeEnv = toNodeEnv(process.env.NODE_ENV);
 const metricsToken = process.env.METRICS_TOKEN?.trim() || null;
+const trustProxy = toBoolean(process.env.TRUST_PROXY, nodeEnv === "production");
+const trustedProxyCidrs = parseCsv(process.env.TRUSTED_PROXY_CIDRS);
+const rateLimitStore = parseRateLimitStore(process.env.RATE_LIMIT_STORE);
+const rateLimitRequireRedis = toBoolean(
+  process.env.RATE_LIMIT_REQUIRE_REDIS,
+  nodeEnv === "production"
+);
 
 if (nodeEnv === "production" && !metricsToken) {
   throw new Error("METRICS_TOKEN is required in production.");
 }
 
+if (nodeEnv === "production" && trustProxy && trustedProxyCidrs.length === 0) {
+  throw new Error("TRUSTED_PROXY_CIDRS is required in production when TRUST_PROXY=true.");
+}
+
 export const env: AppEnv = {
   nodeEnv,
   port: toPort(process.env.PORT, 4000),
-  trustProxy: toBoolean(process.env.TRUST_PROXY, nodeEnv === "production"),
+  trustProxy,
+  trustedProxyCidrs,
   apiPrefix: validateApiPrefix(process.env.API_PREFIX),
   corsAllowedOrigins: resolveCorsAllowedOrigins(
     nodeEnv,
@@ -201,6 +223,8 @@ export const env: AppEnv = {
     process.env.RATE_LIMIT_ENABLED,
     nodeEnv === "test" ? false : true
   ),
+  rateLimitStore,
+  rateLimitRequireRedis,
   rateLimitWindowSeconds: toNumber(
     "RATE_LIMIT_WINDOW_SECONDS",
     process.env.RATE_LIMIT_WINDOW_SECONDS,

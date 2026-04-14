@@ -11,18 +11,22 @@ process.env.DATABASE_URL =
   "postgresql://pac_user:pac_password@localhost:5432/pac_nymaju_spr?schema=public";
 process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET ?? "test_access_secret";
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? "test_refresh_secret";
+process.env.RATE_LIMIT_ENABLED = "true";
+process.env.RATE_LIMIT_STORE = "memory";
+process.env.RATE_LIMIT_REQUIRE_REDIS = "false";
 
 describe("Rate limit middleware", () => {
   let server: http.Server;
   let baseUrl = "";
   let originalRateLimitEnabled = false;
-  let envModule: { env: { rateLimitEnabled: boolean } };
+  let envModule: { env: { rateLimitEnabled: boolean; rateLimitStore: "memory" | "redis" } };
 
   before(async () => {
     envModule = await import("../lib/env");
     const { createRateLimitMiddleware } = await import("../middlewares/rate-limit");
     originalRateLimitEnabled = envModule.env.rateLimitEnabled;
     envModule.env.rateLimitEnabled = true;
+    envModule.env.rateLimitStore = "memory";
     const app = express();
     app.use(
       "/limited",

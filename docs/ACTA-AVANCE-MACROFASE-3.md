@@ -994,3 +994,42 @@ Resultado observado:
 
 Conclusión:
 - control de acceso funciona, pero el modelo sigue siendo secreto estatico; mantener rotacion y custodia en secret manager.
+
+## Actualizacion M3-F2 (cierre R1/R2: rate limit distribuido + hardening proxy de borde)
+
+Fecha avance: 2026-04-14
+
+Se implementa M3-F2 para mitigar riesgos residuales R1 y R2.
+
+1. Rate limiting distribuido (R1):
+- nuevo cliente Redis en `apps/api/src/lib/redis.ts`,
+- middleware `rate-limit` migrado a contador distribuido via Redis (`INCR` + `EXPIRE` + `TTL`),
+- fallback controlado a memoria solo cuando `RATE_LIMIT_REQUIRE_REDIS=false`,
+- modo estricto para produccion con `RATE_LIMIT_REQUIRE_REDIS=true` recomendado.
+
+2. Hardening de proxy confiable (R2):
+- se agregan variables:
+  - `TRUSTED_PROXY_CIDRS`,
+  - `RATE_LIMIT_STORE`,
+  - `RATE_LIMIT_REQUIRE_REDIS`.
+- validacion estricta:
+  - en produccion, si `TRUST_PROXY=true`, se exige `TRUSTED_PROXY_CIDRS`,
+- `app.ts` configura `trust proxy` por lista CIDR cuando existe.
+
+3. Arranque seguro:
+- `main.ts` incorpora bootstrap de dependencias de seguridad:
+  - valida conectividad Redis antes de operar en modo estricto,
+  - registra estado de conectividad,
+  - desconecta Redis en shutdown.
+
+4. Evidencia tecnica:
+- `pnpm.cmd preflight:ci` -> OK.
+- flujo validado:
+  - lint,
+  - typecheck,
+  - unit tests,
+  - e2e tests (`38/38`),
+  - build web.
+
+Estado M3-F2:
+- IMPLEMENTADO Y VALIDADO EN LOCAL.

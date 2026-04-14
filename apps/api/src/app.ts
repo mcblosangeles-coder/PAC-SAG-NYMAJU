@@ -33,7 +33,11 @@ export const createApp = (): express.Express => {
   const corsAllowedOrigins = env.corsAllowedOrigins;
 
   app.disable("x-powered-by");
-  app.set("trust proxy", env.trustProxy);
+  if (env.trustedProxyCidrs.length > 0) {
+    app.set("trust proxy", env.trustedProxyCidrs);
+  } else {
+    app.set("trust proxy", env.trustProxy);
+  }
 
   app.use((req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
