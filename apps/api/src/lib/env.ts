@@ -1,8 +1,9 @@
 type AppEnv = {
   nodeEnv: "development" | "test" | "production";
   port: number;
+  trustProxy: boolean;
   apiPrefix: string;
-  corsOrigin: string;
+  corsAllowedOrigins: string[];
   metricsToken: string | null;
   metricsCollectorEnabled: boolean;
   metricsCollectorIntervalSeconds: number;
@@ -11,6 +12,11 @@ type AppEnv = {
   alertsEvaluatorIntervalSeconds: number;
   alertsNotificationCooldownSeconds: number;
   alertsNotifyChannels: Array<"log" | "audit">;
+  rateLimitEnabled: boolean;
+  rateLimitWindowSeconds: number;
+  rateLimitAuthLoginMax: number;
+  rateLimitAuthRefreshMax: number;
+  rateLimitInternalMax: number;
   databaseUrl: string;
   redisUrl: string;
   jwtAccessSecret: string;
@@ -24,7 +30,24 @@ const required = (name: string, value: string | undefined): string => {
     throw new Error(`Missing required environment variable: ${name}`);
   }
 
-  return value;
+  return value.trim();
+};
+
+const toNodeEnv = (value: string | undefined): AppEnv["nodeEnv"] => {
+  if (!value || value.trim().length === 0) return "development";
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "development" || normalized === "test" || normalized === "production") {
+    return normalized;
+  }
+  throw new Error(`Invalid NODE_ENV value: ${value}`);
+};
+
+const toBoolean = (value: string | undefined, fallback: boolean): boolean => {
+  if (!value || value.trim().length === 0) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
 };
 
 const toNumber = (name: string, value: string | undefined, fallback: number): number => {
@@ -36,26 +59,12 @@ const toNumber = (name: string, value: string | undefined, fallback: number): nu
   return parsed;
 };
 
-const toNodeEnv = (value: string | undefined): AppEnv["nodeEnv"] => {
-  if (value === "production" || value === "test") return value;
-  return "development";
-};
-
-const toBoolean = (value: string | undefined, fallback: boolean): boolean => {
-  if (!value || value.trim().length === 0) return fallback;
-  const normalized = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) return true;
-  if (["0", "false", "no", "off"].includes(normalized)) return false;
-  return fallback;
-};
-
-const toNotifyChannels = (rawValue: string | undefined): Array<"log" | "audit"> => {
-  if (!rawValue || rawValue.trim().length === 0) return ["log", "audit"];
-  const channels = rawValue
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter((item): item is "log" | "audit" => item === "log" || item === "audit");
-  return channels.length > 0 ? channels : ["log", "audit"];
+const toPort = (value: string | undefined, fallback: number): number => {
+  const parsed = toNumber("PORT", value, fallback);
+  if (parsed < 1 || parsed > 65535) {
+    throw new Error(`Invalid PORT value: ${parsed}`);
+  }
+  return parsed;
 };
 
 const validateUrl = (name: string, value: string): string => {
@@ -68,15 +77,104 @@ const validateUrl = (name: string, value: string): string => {
   }
 };
 
+const parseCsv = (value: string | undefined): string[] =>
+  (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+
+const toNotifyChannels = (rawValue: string | undefined): Array<"log" | "audit"> => {
+  if (!rawValue || rawValue.trim().length === 0) return ["log", "audit"];
+  const channels = rawValue
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter((item): item is "log" | "audit" => item === "log" || item === "audit");
+  return channels.length > 0 ? channels : ["log", "audit"];
+};
+
+const validateApiPrefix = (value: string | undefined): string => {
+  const prefix = value?.trim() || "/api/v1";
+  if (!prefix.startsWith("/")) {
+    throw new Error(`Invalid API_PREFIX: ${prefix}. It must start with '/'.`);
+  }
+  return prefix;
+};
+
+const resolveCorsAllowedOrigins = (
+  nodeEnv: AppEnv["nodeEnv"],
+  corsAllowedOriginsRaw: string | undefined,
+  corsOriginFallbackRaw: string | undefined
+): string[] => {
+  const fromList = parseCsv(corsAllowedOriginsRaw);
+  const fallback = corsOriginFallbackRaw?.trim();
+  const origins = fromList.length > 0 ? fromList : fallback ? [fallback] : ["http://localhost:5173"];
+
+  if (nodeEnv === "production") {
+    if (origins.length === 0) {
+      throw new Error("CORS_ALLOWED_ORIGINS is required in production.");
+    }
+
+    if (origins.includes("*")) {
+      throw new Error("CORS wildcard '*' is not allowed in production.");
+    }
+
+    for (const origin of origins) {
+      const parsed = new URL(origin);
+      if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+        throw new Error(`Loopback origin not allowed in production CORS: ${origin}`);
+      }
+    }
+  }
+
+  return origins;
+};
+
+const validateJwtSecret = (
+  name: "JWT_ACCESS_SECRET" | "JWT_REFRESH_SECRET",
+  secret: string,
+  nodeEnv: AppEnv["nodeEnv"]
+): string => {
+  const normalized = secret.trim();
+  if (normalized.length === 0) {
+    throw new Error(`${name} cannot be empty.`);
+  }
+
+  if (nodeEnv === "production") {
+    if (normalized.length < 32) {
+      throw new Error(`${name} must have at least 32 chars in production.`);
+    }
+    if (
+      normalized.toLowerCase().includes("replace_in_local_env") ||
+      normalized.toLowerCase().includes("ci_")
+    ) {
+      throw new Error(`${name} appears to be a placeholder/weak secret in production.`);
+    }
+  }
+
+  return normalized;
+};
+
+const nodeEnv = toNodeEnv(process.env.NODE_ENV);
+const metricsToken = process.env.METRICS_TOKEN?.trim() || null;
+
+if (nodeEnv === "production" && !metricsToken) {
+  throw new Error("METRICS_TOKEN is required in production.");
+}
+
 export const env: AppEnv = {
-  nodeEnv: toNodeEnv(process.env.NODE_ENV),
-  port: toNumber("PORT", process.env.PORT, 4000),
-  apiPrefix: process.env.API_PREFIX?.trim() || "/api/v1",
-  corsOrigin: process.env.CORS_ORIGIN?.trim() || "http://localhost:5173",
-  metricsToken: process.env.METRICS_TOKEN?.trim() || null,
+  nodeEnv,
+  port: toPort(process.env.PORT, 4000),
+  trustProxy: toBoolean(process.env.TRUST_PROXY, nodeEnv === "production"),
+  apiPrefix: validateApiPrefix(process.env.API_PREFIX),
+  corsAllowedOrigins: resolveCorsAllowedOrigins(
+    nodeEnv,
+    process.env.CORS_ALLOWED_ORIGINS,
+    process.env.CORS_ORIGIN
+  ),
+  metricsToken,
   metricsCollectorEnabled: toBoolean(
     process.env.METRICS_COLLECTOR_ENABLED,
-    process.env.NODE_ENV === "test" ? false : true
+    nodeEnv === "test" ? false : true
   ),
   metricsCollectorIntervalSeconds: toNumber(
     "METRICS_COLLECTOR_INTERVAL_SECONDS",
@@ -86,7 +184,7 @@ export const env: AppEnv = {
   metricsRetentionDays: toNumber("METRICS_RETENTION_DAYS", process.env.METRICS_RETENTION_DAYS, 30),
   alertsEvaluatorEnabled: toBoolean(
     process.env.ALERTS_EVALUATOR_ENABLED,
-    process.env.NODE_ENV === "test" ? false : true
+    nodeEnv === "test" ? false : true
   ),
   alertsEvaluatorIntervalSeconds: toNumber(
     "ALERTS_EVALUATOR_INTERVAL_SECONDS",
@@ -99,10 +197,42 @@ export const env: AppEnv = {
     900
   ),
   alertsNotifyChannels: toNotifyChannels(process.env.ALERTS_NOTIFY_CHANNELS),
+  rateLimitEnabled: toBoolean(
+    process.env.RATE_LIMIT_ENABLED,
+    nodeEnv === "test" ? false : true
+  ),
+  rateLimitWindowSeconds: toNumber(
+    "RATE_LIMIT_WINDOW_SECONDS",
+    process.env.RATE_LIMIT_WINDOW_SECONDS,
+    60
+  ),
+  rateLimitAuthLoginMax: toNumber(
+    "RATE_LIMIT_AUTH_LOGIN_MAX",
+    process.env.RATE_LIMIT_AUTH_LOGIN_MAX,
+    10
+  ),
+  rateLimitAuthRefreshMax: toNumber(
+    "RATE_LIMIT_AUTH_REFRESH_MAX",
+    process.env.RATE_LIMIT_AUTH_REFRESH_MAX,
+    20
+  ),
+  rateLimitInternalMax: toNumber(
+    "RATE_LIMIT_INTERNAL_MAX",
+    process.env.RATE_LIMIT_INTERNAL_MAX,
+    120
+  ),
   databaseUrl: validateUrl("DATABASE_URL", required("DATABASE_URL", process.env.DATABASE_URL)),
   redisUrl: validateUrl("REDIS_URL", process.env.REDIS_URL?.trim() || "redis://localhost:6379"),
-  jwtAccessSecret: required("JWT_ACCESS_SECRET", process.env.JWT_ACCESS_SECRET),
-  jwtRefreshSecret: required("JWT_REFRESH_SECRET", process.env.JWT_REFRESH_SECRET),
+  jwtAccessSecret: validateJwtSecret(
+    "JWT_ACCESS_SECRET",
+    required("JWT_ACCESS_SECRET", process.env.JWT_ACCESS_SECRET),
+    nodeEnv
+  ),
+  jwtRefreshSecret: validateJwtSecret(
+    "JWT_REFRESH_SECRET",
+    required("JWT_REFRESH_SECRET", process.env.JWT_REFRESH_SECRET),
+    nodeEnv
+  ),
   jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN?.trim() || "15m",
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN?.trim() || "7d"
 };

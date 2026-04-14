@@ -1,7 +1,8 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../../lib/env";
 import { API_ERROR_CODE, sendApiError } from "../../lib/api-error";
+import { createRateLimitMiddleware } from "../../middlewares/rate-limit";
 import { authService, AuthError } from "./auth.service";
 import type { JwtTokenPayload } from "./auth.types";
 
@@ -20,7 +21,24 @@ const bodyString = (value: unknown): string | null => {
 
 export const authRouter: Router = Router();
 
-authRouter.post("/login", async (req, res) => {
+const authKeyResolver = (req: Request) =>
+  `${req.ip}|${req.header("user-agent")?.trim() || "no-ua"}`;
+
+const loginRateLimit = createRateLimitMiddleware({
+  id: "auth.login",
+  windowSeconds: env.rateLimitWindowSeconds,
+  maxRequests: env.rateLimitAuthLoginMax,
+  keyResolver: authKeyResolver
+});
+
+const refreshRateLimit = createRateLimitMiddleware({
+  id: "auth.refresh",
+  windowSeconds: env.rateLimitWindowSeconds,
+  maxRequests: env.rateLimitAuthRefreshMax,
+  keyResolver: authKeyResolver
+});
+
+authRouter.post("/login", loginRateLimit, async (req, res) => {
   try {
     const email = bodyString(req.body?.email);
     const password = bodyString(req.body?.password);
@@ -43,7 +61,7 @@ authRouter.post("/login", async (req, res) => {
   }
 });
 
-authRouter.post("/refresh", async (req, res) => {
+authRouter.post("/refresh", refreshRateLimit, async (req, res) => {
   try {
     const refreshToken = bodyString(req.body?.refreshToken);
     if (!refreshToken) {

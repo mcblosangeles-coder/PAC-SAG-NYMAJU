@@ -886,3 +886,111 @@ Fecha cierre: 2026-04-14
 
 Resultado:
 - brecha de lint global cerrada.
+
+## Actualizacion M3-F1 (hardening de seguridad y operacion en produccion)
+
+Fecha avance: 2026-04-14
+
+Se ejecuta M3-F1 en el orden aprobado:
+
+1. Gestion robusta de secretos y entorno:
+- validaciones estrictas en `env.ts` para produccion (`NODE_ENV`, CORS, JWT, `METRICS_TOKEN`),
+- politica formal documentada en `docs/M3-F1-POLITICA-SECRETOS-Y-ENTORNO.md`,
+- `.env.example` actualizado con variables de hardening (`TRUST_PROXY`, `CORS_ALLOWED_ORIGINS`, `RATE_LIMIT_*`).
+
+2. Rate limiting en endpoints sensibles:
+- middleware `createRateLimitMiddleware` incorporado,
+- aplicado en:
+  - `/api/v1/auth/login`,
+  - `/api/v1/auth/refresh`,
+  - router interno `/api/v1/internal/*`.
+- nuevo codigo API `RATE_LIMITED`.
+
+3. Security headers y CORS por ambiente:
+- headers de seguridad base en `app.ts`,
+- HSTS en produccion,
+- CORS con allowlist por `CORS_ALLOWED_ORIGINS`.
+
+4. Operacion productiva:
+- runbook de incidentes: `docs/M3-F1-RUNBOOK-INCIDENTES-PROD.md`,
+- checklist de deploy productivo: `docs/M3-F1-CHECKLIST-DEPLOY-PROD.md`.
+
+5. Gate CI final en flujo unico:
+- `preflight:ci` actualizado a:
+  - lint,
+  - API typecheck,
+  - API unit tests,
+  - API e2e tests,
+  - web build.
+- workflow CI ajustado para ejecutar solo `pnpm preflight:ci` como gate final.
+
+Estado M3-F1:
+- IMPLEMENTADO (pendiente ejecucion final de verificacion local para cierre formal).
+
+## Cierre validacion M3-F1
+
+Fecha cierre: 2026-04-14
+
+Evidencia ejecutada:
+
+1. `pnpm.cmd preflight:ci` -> OK.
+2. Flujo validado en una sola corrida:
+- lint global,
+- typecheck API,
+- unit API,
+- e2e API (`38/38`),
+- build web.
+
+Resultado final:
+- M3-F1 VALIDADO Y CERRADO.
+
+## Validacion operativa de riesgos M3-F1 (R1-R3)
+
+Fecha: 2026-04-14
+
+### Riesgo 1 - Rate limit en memoria (no distribuido/persistente)
+
+Comandos ejecutados:
+1. Proceso A: 3 llamadas consecutivas a `POST /api/v1/auth/login` con `RATE_LIMIT_AUTH_LOGIN_MAX=2`.
+2. Proceso B (nuevo proceso): 1 llamada a `POST /api/v1/auth/login` con misma configuracion.
+
+Resultado observado:
+1. Proceso A: `400, 400, 429`.
+2. Proceso B (tras reinicio de proceso): `400`.
+
+Conclusión:
+- el contador de rate limit no persiste entre reinicios de proceso (riesgo vigente para HA/escala horizontal).
+
+### Riesgo 2 - Dependencia de TRUST_PROXY / X-Forwarded-For
+
+Comando ejecutado:
+1. API con `TRUST_PROXY=true` y `RATE_LIMIT_AUTH_LOGIN_MAX=1`.
+2. Tres llamadas a `POST /api/v1/auth/login`:
+- llamada 1 con `x-forwarded-for: 1.1.1.1`,
+- llamada 2 con `x-forwarded-for: 2.2.2.2`,
+- llamada 3 con `x-forwarded-for: 2.2.2.2`.
+
+Resultado observado:
+1. `400` (primera IP),
+2. `400` (segunda IP cambia clave de limitador),
+3. `429` (repeticion de segunda IP).
+
+Conclusión:
+- con `TRUST_PROXY=true`, la IP efectiva para rate limit depende de cadena `X-Forwarded-For`; requiere control estricto en borde/proxy.
+
+### Riesgo 3 - Token estatico en endpoints internos
+
+Comando ejecutado:
+1. API con `METRICS_TOKEN=m3f1-ops-token`.
+2. Validaciones sobre `GET /api/v1/internal/metrics`:
+- sin header,
+- con token incorrecto,
+- con token correcto.
+
+Resultado observado:
+1. sin token -> `403`,
+2. token incorrecto -> `403`,
+3. token correcto -> `200`.
+
+Conclusión:
+- control de acceso funciona, pero el modelo sigue siendo secreto estatico; mantener rotacion y custodia en secret manager.

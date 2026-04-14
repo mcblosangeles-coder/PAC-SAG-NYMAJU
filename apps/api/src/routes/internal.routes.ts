@@ -2,12 +2,22 @@ import { Router, type Request, type Response } from "express";
 import { env } from "../lib/env";
 import { API_ERROR_CODE, sendApiError } from "../lib/api-error";
 import { logger } from "../lib/logger";
+import { createRateLimitMiddleware } from "../middlewares/rate-limit";
 import { operationalAlertsService } from "../modules/metrics/operational-alerts.service";
 import { metricsHistoryService } from "../modules/metrics/metrics-history.service";
 import { operationalMetricsService } from "../modules/metrics/operational-metrics.service";
 
 export const internalRouter: Router = Router();
 const MAX_PAGE_SIZE = 100;
+
+const internalRateLimit = createRateLimitMiddleware({
+  id: "internal.api",
+  windowSeconds: env.rateLimitWindowSeconds,
+  maxRequests: env.rateLimitInternalMax,
+  keyResolver: (req) => req.ip || "unknown-ip"
+});
+
+internalRouter.use(internalRateLimit);
 
 const ensureMetricsAccess = (req: Request, res: Response): boolean => {
   const configuredToken = env.metricsToken;

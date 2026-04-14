@@ -22,7 +22,7 @@
     "docker:logs": "docker compose -f infra/compose/docker-compose.yml logs -f",
     "smoke:local": "powershell -ExecutionPolicy Bypass -File ./scripts/smoke-local.ps1",
     "preflight:local": "powershell -ExecutionPolicy Bypass -File ./scripts/preflight-local.ps1",
-    "preflight:ci": "pnpm --filter @pac/api typecheck && pnpm --filter @pac/api test:unit && pnpm --filter @pac/api test:e2e"
+    "preflight:ci": "pnpm lint && pnpm --filter @pac/api typecheck && pnpm --filter @pac/api test:unit && pnpm --filter @pac/api test:e2e && pnpm --filter @pac/web build"
   },
   "prisma": {
     "seed": "tsx prisma/seed/seed.ts"

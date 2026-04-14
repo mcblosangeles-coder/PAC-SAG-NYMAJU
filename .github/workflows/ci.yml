@@ -12,7 +12,7 @@
 
 jobs:
   api-quality:
-    name: Lint + API Typecheck + Tests
+    name: Final Quality Gate
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -66,14 +66,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run lint gate
-        run: pnpm lint
-
       - name: Generate Prisma client
         run: pnpm db:generate
 
       - name: Apply migrations
         run: pnpm db:migrate:deploy
 
-      - name: Run quality gates
+      - name: Run final quality gate
         run: pnpm preflight:ci

@@ -9,6 +9,7 @@ describe("api-error", () => {
       invalidPayload: "INVALID_PAYLOAD",
       unauthenticated: "UNAUTHENTICATED",
       forbidden: "FORBIDDEN",
+      rateLimited: "RATE_LIMITED",
       notFound: "NOT_FOUND",
       conflict: "CONFLICT",
       unprocessableEntity: "UNPROCESSABLE_ENTITY",

@@ -57,5 +57,14 @@ describe("Health endpoint contract", async () => {
     assert.equal(typeof body.timestamp, "string");
     assert.equal(Number.isNaN(Date.parse(body.timestamp)), false);
     assert.equal(body.code, undefined);
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(response.headers.get("x-frame-options"), "DENY");
+    assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+    assert.equal(response.headers.get("cross-origin-opener-policy"), "same-origin");
+    assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
+    assert.match(
+      response.headers.get("content-security-policy") ?? "",
+      /default-src 'none'; frame-ancestors 'none'; base-uri 'none'/i
+    );
   });
 });

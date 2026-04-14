@@ -29,10 +29,41 @@ const resolveRequestId = (requestIdHeader: string | undefined): string => {
 
 export const createApp = (): express.Express => {
   const app = express();
-  const corsOrigin = env.corsOrigin;
   const apiPrefix = env.apiPrefix;
+  const corsAllowedOrigins = env.corsAllowedOrigins;
 
-  app.use(cors({ origin: corsOrigin }));
+  app.disable("x-powered-by");
+  app.set("trust proxy", env.trustProxy);
+
+  app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+    if (env.nodeEnv === "production") {
+      res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+    }
+    next();
+  });
+
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+        if (corsAllowedOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(new Error("CORS origin not allowed."));
+      }
+    })
+  );
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use((req, res, next) => {
