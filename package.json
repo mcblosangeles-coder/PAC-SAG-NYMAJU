@@ -1,0 +1,46 @@
+{
+  "name": "pac-nymaju-spr",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Monorepo base PAC NYMAJU SPR",
+  "packageManager": "pnpm@9.12.3",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "format": "prettier --write .",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev --name init",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma migrate reset --force",
+    "db:init": "pnpm db:generate && pnpm db:migrate && pnpm db:seed",
+    "docker:up": "docker compose -f infra/compose/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infra/compose/docker-compose.yml down",
+    "docker:logs": "docker compose -f infra/compose/docker-compose.yml logs -f",
+    "smoke:local": "powershell -ExecutionPolicy Bypass -File ./scripts/smoke-local.ps1",
+    "preflight:local": "powershell -ExecutionPolicy Bypass -File ./scripts/preflight-local.ps1",
+    "preflight:ci": "pnpm --filter @pac/api typecheck && pnpm --filter @pac/api test:unit && pnpm --filter @pac/api test:e2e"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.19.0",
+    "@typescript-eslint/parser": "^8.19.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prisma": "^5.22.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}
