@@ -259,3 +259,34 @@ Estado:
 Iniciar bloque de salida operativa de MacroFase 5:
 
 - `M5-D1` - Paquete RC/cierre operativo (evidencia consolidada, decision de salida y handoff ejecutivo-tecnico).
+
+## Cierre M5-D1 (paquete RC/cierre operativo)
+
+Fecha cierre: 2026-04-15
+
+Se ejecuta M5-D1 en la secuencia definida:
+
+1. Consolidacion de evidencia final RC.
+2. Matriz de riesgos residuales con dueno/fecha.
+3. Decision formal de salida `go/no-go`.
+
+### Entregables emitidos
+
+1. `docs/M5-D1-PAQUETE-RC-CIERRE-OPERATIVO.md`
+2. `docs/M5-D1-MATRIZ-RIESGOS-RESIDUALES.md`
+3. `docs/M5-D1-DECISION-SALIDA-RC.md`
+
+### Resultado
+
+1. Gate RC consolidado sobre baseline documentado.
+2. Riesgos bloqueantes: `0`.
+3. Riesgos no bloqueantes: gestionados con mitigacion, dueno y fecha objetivo.
+4. Decision formal: **GO (salida controlada)**.
+
+Estado:
+
+- M5-D1: **CERRADO FORMALMENTE**.
+
+## Siguiente bloque
+
+Iniciar `M5-E1` (ejecucion de salida operativa controlada + seguimiento de riesgos residuales y evidencia de estabilidad post-RC).
