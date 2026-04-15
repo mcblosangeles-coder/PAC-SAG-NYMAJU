@@ -273,3 +273,79 @@ Resultados:
 Estado:
 
 - Riesgos residuales de M4: mitigados a nivel bajo y controlado.
+
+## Revalidacion post-consolidacion (2026-04-15)
+
+Se ejecuta control de linea base unica tras commit de consolidacion:
+
+1. Commit validado: `0133753` (`main`).
+2. Workflow remoto: `CI Quality Gates #12` -> `completed successfully`.
+3. Decision: iniciar directamente M4-A1-02 sobre baseline consolidado.
+
+### Inicio operativo M4-A1-02 (directo)
+
+Objetivo inmediato:
+
+1. Revalidar contrato API F1-F5 contra estado actual de rutas/controladores.
+2. Confirmar codigos y payloads de error aplicables por flujo (`400/401/403/404/409/422/429/500`).
+3. Dejar contrato en estado "listo para ejecucion de ajustes de backend/UI".
+
+Estado:
+
+- M4-A1-02: EN EJECUCION (revalidacion contractual post-consolidacion).
+
+## Cierre tecnico M4-A1-02 (revalidacion endpoint por endpoint)
+
+Fecha cierre: 2026-04-15
+
+Accion ejecutada:
+
+1. Revalidacion tecnica F1-F5 contra rutas/controladores/servicios actuales.
+2. Cruce de contrato con evidencia de pruebas E2E vigentes.
+3. Ajuste contractual para eliminar desviaciones no implementadas.
+
+Resultado:
+
+1. Se detectaron brechas documentales en F2/F3/F4/F5 (payload y codigos esperados).
+2. No se detectaron brechas bloqueantes de implementacion backend para M4-A1-02.
+3. Contrato actualizado y alineado al comportamiento real de API.
+
+Estado final:
+
+- M4-A1-02: CERRADO Y VALIDADO.
+
+## Inicio M4-A2-01 (iteracion post-congelamiento contractual)
+
+Fecha inicio: 2026-04-15
+
+Decision operativa:
+
+1. Usar `M4-A1-02` como contrato congelado unico para cualquier ajuste backend/UI nuevo.
+2. Reabrir M4-A2-01 en modalidad iterativa para ejecutar validacion de cumplimiento contractual sobre baseline consolidado.
+3. Limitar cambios a incidencias funcionales reales (evitar retrabajo documental sin impacto).
+
+Objetivo de esta iteracion:
+
+1. Confirmar cumplimiento contrato-backend F1-F5.
+2. Aplicar ajustes minimos si aparece brecha bloqueante.
+3. Cerrar con evidencia tecnica y acta.
+
+Estado:
+
+- M4-A2-01 (iteracion post-congelamiento): EN EJECUCION.
+
+## Cierre M4-A2-01 (iteracion post-congelamiento contractual)
+
+Fecha cierre: 2026-04-15
+
+Evidencia tecnica ejecutada:
+
+1. `pnpm.cmd --filter @pac/api typecheck` -> OK.
+2. `pnpm.cmd --filter @pac/api test:e2e` -> OK (`43/43`).
+3. `pnpm.cmd --filter @pac/web build` -> OK.
+
+Resultado:
+
+1. Contrato congelado M4-A1-02 aplicado como baseline unico.
+2. Sin brechas funcionales bloqueantes backend/UI para F1-F5 en esta iteracion.
+3. M4-A2-01 (iteracion post-congelamiento): CERRADO Y VALIDADO.

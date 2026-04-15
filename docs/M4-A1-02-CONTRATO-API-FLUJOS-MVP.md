@@ -1,5 +1,14 @@
 # M4-A1-02 - Contrato API de Flujos Criticos MVP
 
+## Estado de ejecucion (2026-04-15)
+
+- Estado: CERRADO Y VALIDADO (revalidacion post-consolidacion completada).
+- Baseline de referencia: commit `0133753` en `main` con CI remoto en verde.
+- Alcance de esta iteracion:
+  1. verificar consistencia del contrato F1-F5 con backend actual,
+  2. ajustar desviaciones de codigos/errores y casos limite,
+  3. dejar contrato congelado para fase de implementacion posterior.
+
 ## Contexto
 
 Contrato API alineado al estado actual de backend para los 5 flujos criticos definidos en M4-A1-01.
@@ -25,6 +34,26 @@ Codigos de error estandar disponibles:
 - `CONFLICT`
 - `UNPROCESSABLE_ENTITY`
 - `INTERNAL_ERROR`
+
+---
+
+## Matriz de brechas - Revalidacion tecnica F1-F5 (2026-04-15)
+
+| Flujo | Endpoint | Estado | Hallazgo | Accion aplicada |
+|---|---|---|---|---|
+| F1 | `POST /auth/login` | OK | Sin brecha relevante en codigos/forma esperada para MVP. | Sin cambios. |
+| F1 | `GET /auth/me` | OK | Contrato consistente (`401` token invalido, `404` usuario no encontrado). | Sin cambios. |
+| F1 | `POST /auth/refresh` | OK | Contrato consistente (`400/401/429/500`). | Sin cambios. |
+| F2 | `GET /expedientes/:id` | BRECHA | Ejemplo contractual no reflejaba payload real (`proyecto`, `etapasResumen`, `bloqueos`, `canAdvance`). | Contrato actualizado a payload real. |
+| F3 | `GET /expedientes/:id/workflow` | BRECHA | Ejemplo usaba `estadoActual`; backend expone `estadoGlobal` + bloqueos. | Contrato actualizado a payload real. |
+| F3 | `GET /expedientes/:id/history` | BRECHA | Contrato no reflejaba `expedienteId` + `pagination` y nombres reales (`createdAt`, `scope` en mayusculas). | Contrato actualizado a payload real. |
+| F4 | `POST /expedientes/:id/change-state` | BRECHA | Contrato incluia `changedAt` no devuelto por API. | Contrato actualizado (se elimina `changedAt`). |
+| F5 | `POST /expedientes/:id/reopen-stage` | BRECHA | Contrato incluia `reopenedAt` y `422`; backend devuelve `estadoAnterior/estadoNuevo` y no emite `422` en esta accion. | Contrato actualizado a comportamiento real. |
+
+Resultado de revalidacion:
+
+1. No se requiere cambio de codigo para cerrar M4-A1-02.
+2. El cierre se realiza por alineacion contractual a implementacion vigente.
 
 ---
 
@@ -149,13 +178,24 @@ Codigos de error estandar disponibles:
 ```json
 {
   "expedienteId": "EXP-010",
-  "estadoActual": "EN_REVISION",
-  "etapaActual": "REVISION_TECNICA",
-  "responsableActual": {
-    "id": "uuid",
-    "nombre": "Usuario"
+  "codigoInterno": "PAC-2026-001",
+  "estadoGlobal": "DOCUMENTAL",
+  "proyecto": {
+    "id": "EXP-010",
+    "nombre": "Proyecto A"
   },
-  "actualizadoEn": "2026-04-14T18:00:00.000Z"
+  "responsableActual": {
+    "userId": "USR-01",
+    "fullName": "Nombre Usuario"
+  },
+  "etapasResumen": [],
+  "bloqueos": {
+    "hasBlockingAlerts": false,
+    "hasBlockingNc": false,
+    "count": 0
+  },
+  "canAdvance": true,
+  "updatedAt": "2026-04-14T18:00:00.000Z"
 }
 ```
 
@@ -187,8 +227,13 @@ Codigos de error estandar disponibles:
 ```json
 {
   "expedienteId": "EXP-001",
-  "estadoActual": "EN_REVISION",
-  "etapas": []
+  "codigoInterno": "PAC-2026-001",
+  "estadoGlobal": "DOCUMENTAL",
+  "etapas": [],
+  "blockingReasons": [],
+  "hasBlockingAlerts": false,
+  "hasBlockingNc": false,
+  "canAdvance": true
 }
 ```
 
@@ -215,16 +260,27 @@ Codigos de error estandar disponibles:
 
 ```json
 {
-  "page": 1,
-  "pageSize": 20,
-  "total": 2,
+  "expedienteId": "EXP-020",
+  "pagination": {
+    "page": 1,
+    "pageSize": 20,
+    "total": 2,
+    "totalPages": 1,
+    "hasNext": false
+  },
   "items": [
     {
       "id": "uuid",
-      "scope": "global",
+      "scope": "GLOBAL",
       "estadoAnterior": "INGRESADO",
       "estadoNuevo": "EN_REVISION",
-      "changedAt": "2026-04-14T18:00:00.000Z"
+      "comentario": "Cambio validado",
+      "createdAt": "2026-04-14T18:00:00.000Z",
+      "changedBy": {
+        "userId": "USR-01",
+        "fullName": "Nombre Usuario"
+      },
+      "etapa": null
     }
   ]
 }
@@ -269,7 +325,6 @@ Codigos de error estandar disponibles:
   "expedienteId": "EXP-002",
   "estadoAnterior": "INGRESADO",
   "estadoNuevo": "EN_REVISION",
-  "changedAt": "2026-04-14T18:00:00.000Z",
   "message": "Estado de expediente actualizado correctamente."
 }
 ```
@@ -314,7 +369,8 @@ Codigos de error estandar disponibles:
 {
   "expedienteId": "EXP-003",
   "etapa": "REVISION_TECNICA",
-  "reopenedAt": "2026-04-14T18:00:00.000Z",
+  "estadoAnterior": "CERRADA",
+  "estadoNuevo": "REABIERTA",
   "message": "Etapa reabierta correctamente."
 }
 ```
@@ -326,7 +382,6 @@ Codigos de error estandar disponibles:
 - `403 FORBIDDEN`
 - `404 NOT_FOUND`
 - `409 CONFLICT` (reapertura no valida por estado)
-- `422 UNPROCESSABLE_ENTITY` (precondiciones no cumplidas)
 - `500 INTERNAL_ERROR`
 
 ---
