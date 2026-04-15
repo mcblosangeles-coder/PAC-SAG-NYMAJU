@@ -349,3 +349,51 @@ Resultado:
 1. Contrato congelado M4-A1-02 aplicado como baseline unico.
 2. Sin brechas funcionales bloqueantes backend/UI para F1-F5 en esta iteracion.
 3. M4-A2-01 (iteracion post-congelamiento): CERRADO Y VALIDADO.
+
+## Registro de pendiente no bloqueante M4-B1 (F5 camino 200)
+
+Fecha registro: 2026-04-15
+
+ID pendiente: `PNB-M4-B1-F5-200`
+
+Detalle:
+
+1. Se valida correctamente manejo de error de negocio F5 (`409 CONFLICT`) en UI/API.
+2. Queda pendiente evidencia de caso positivo `200` para `reopen-stage` por dataset local no reabrible en los expedientes usados.
+
+Plan de cierre (sin frenar avance):
+
+1. Dueno: Backend/Data.
+2. Fecha objetivo: 2026-04-16.
+3. Acciones:
+- crear expediente semilla reabrible,
+- ejecutar prueba dirigida F5 `200`,
+- anexar evidencia y cerrar pendiente en acta.
+
+Estado:
+
+- `PNB-M4-B1-F5-200`: ABIERTO (no bloqueante).
+
+## M4-B2 (iteracion guiada por validacion real M4-B1)
+
+Fecha: 2026-04-15
+
+Entrada:
+
+1. Evidencia funcional real:
+- F4 devuelve `422` esperado por precondiciones.
+- F5 devuelve `409` consistente por etapa no reabrible.
+
+Accion ejecutada:
+
+1. Ajuste UX de error `409` en `reopen-stage` para mensaje prescriptivo con estados fuente validos (`CERRADA|OBSERVADA|BLOQUEADA|VENCIDA|RECHAZADA`).
+2. Registro de ajuste en documento M4-B2.
+
+Evidencia tecnica:
+
+1. `pnpm.cmd --filter @pac/web typecheck` -> OK.
+2. `pnpm.cmd --filter @pac/web build` -> OK.
+
+Estado:
+
+- M4-B2 (iteracion 2026-04-15): CERRADO Y VALIDADO.

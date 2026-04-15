@@ -367,7 +367,7 @@ const toActionableApiError = (
       return "CONFLICT: Transicion de estado invalida. Revise estado actual y secuencia permitida del workflow.";
     }
     if (context === "action.reopen_stage") {
-      return "CONFLICT: La etapa no puede reabrirse desde su estado actual. Revise reglas de reapertura.";
+      return "CONFLICT: La etapa no puede reabrirse desde su estado actual. Use una etapa en estado CERRADA, OBSERVADA, BLOQUEADA, VENCIDA o RECHAZADA.";
     }
     return "CONFLICT: Operacion rechazada por reglas de negocio.";
   }

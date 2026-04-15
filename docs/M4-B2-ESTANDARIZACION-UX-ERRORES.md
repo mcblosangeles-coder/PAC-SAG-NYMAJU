@@ -49,3 +49,23 @@ Cambios:
 ## Estado
 
 - M4-B2: IMPLEMENTADO Y VALIDADO TECNICAMENTE.
+
+## Iteracion con evidencia real de validacion (2026-04-15)
+
+Entrada usada:
+
+1. Validacion funcional visual guiada M4-B1.
+2. Resultado observado:
+- F4 `change-state`: `422 UNPROCESSABLE_ENTITY` (esperado por bloqueos).
+- F5 `reopen-stage`: `409 CONFLICT` repetido por estado no reabrible.
+
+### Ajuste aplicado en esta iteracion
+
+1. Mensaje UX para `CONFLICT` en `action.reopen_stage` se vuelve prescriptivo:
+- antes: "Revise reglas de reapertura".
+- ahora: "Use una etapa en estado `CERRADA|OBSERVADA|BLOQUEADA|VENCIDA|RECHAZADA`."
+
+### Resultado
+
+1. Se reduce ambiguedad operacional en F5.
+2. M4-B2 queda alineado a comportamiento observado en validacion real (no a supuestos).

@@ -67,8 +67,31 @@ Resultados observados:
 2. `change-state` (F4) con `estadoNuevo=APROBADO` sobre `PAC-VERIF-002`:
 - respuesta `UNPROCESSABLE_ENTITY` por bloqueos activos (comportamiento esperado de negocio).
 3. `reopen-stage` (F5) con `REVISION_TECNICA` sobre `PAC-VERIF-001`:
-- camino positivo disponible (`200`) con etapa presembrada en estado reabrible.
+- en validacion guiada actual predominan respuestas `CONFLICT` por estado no reabrible de etapa.
 
 Decision de cierre:
 - M4-B1 se considera cerrado para objetivo de interfaz operativa y manejo de respuestas de negocio/control de errores.
 - Riesgo de dependencia de token manual mitigado con login integrado en UI.
+
+## Pendiente no bloqueante (mitigacion sin frenar)
+
+ID: `PNB-M4-B1-F5-200`
+
+1. Pendiente formal:
+- falta evidencia funcional de camino positivo `200` para F5 (`reopen-stage`) en entorno local actual.
+
+2. Dueno:
+- `Owner`: Backend/Data (responsable de seed operativo de validacion).
+
+3. Fecha objetivo:
+- `Due date`: 2026-04-16.
+
+4. Plan de mitigacion:
+- crear 1 expediente semilla con al menos una etapa en estado reabrible (`CERRADA|OBSERVADA|BLOQUEADA|VENCIDA|RECHAZADA`),
+- ejecutar 1 prueba dirigida F5 (`POST /expedientes/:id/reopen-stage`) con respuesta esperada `200`,
+- anexar evidencia (captura UI + salida API) en acta.
+
+5. Criterio de cierre del pendiente:
+- evidencia de `200` registrada y verificada,
+- acta actualizada marcando `PNB-M4-B1-F5-200` como `CERRADO`,
+- sin reabrir el bloque M4-B1 completo.
