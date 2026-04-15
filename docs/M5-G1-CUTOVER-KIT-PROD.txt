@@ -1,0 +1,28 @@
+M5-G1 CUTOVER KIT (pendiente entorno productivo)
+
+1) Datos requeridos
+- FQDN_API_PROD=
+- HOST_QA_OPCIONAL=
+- PLATAFORMA_BORDE=
+- RESPONSABLE_CAMBIO=
+- VENTANA_CAMBIO_UTC=
+
+2) Politica a aplicar
+- Forzar x-traffic-profile=operational en host operacional
+- Forzar x-traffic-profile=validation en host/ruta QA
+- Rechazar valores invalidos con 400
+- Bloquear sobrescritura externa
+
+3) Pruebas obligatorias post-cutover
+A) 400 invalido:
+curl -i -H "x-traffic-profile: bad_value" https://<FQDN_API_PROD>/api/v1/health
+
+B) 200 normal:
+curl -i https://<FQDN_API_PROD>/api/v1/health
+
+C) Metrics operational:
+curl -s -H "x-metrics-token: <METRICS_TOKEN>" "https://<FQDN_API_PROD>/api/v1/internal/metrics?profile=operational"
+
+4) Criterio GO
+- A=400, B=200, C=200 con payload coherente
+- profile_header_valid_rate >= 0.999
