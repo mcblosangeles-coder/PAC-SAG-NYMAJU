@@ -1,4 +1,5 @@
 import {
+  Prisma,
   EstadoAlerta,
   EstadoEtapa,
   EstadoExpedienteGlobal,
@@ -52,6 +53,25 @@ type ReopenStageResult = {
 };
 
 type OperationalSummaryResult = OperationalSummaryView;
+
+type ListOperationalSummariesInput = {
+  q?: string | null;
+  estadoGlobal?: string | null;
+  responsableUserId?: string | null;
+  page: number;
+  pageSize: number;
+};
+
+type ListOperationalSummariesResult = {
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+  };
+  items: OperationalSummaryView[];
+};
 
 type HistoryScopeFilter = "all" | "global" | "stage";
 
@@ -137,6 +157,133 @@ const isTipoEtapa = (value: string): value is TipoEtapa =>
   Object.values(TipoEtapa).includes(value as TipoEtapa);
 
 export const expedientesService = {
+  async listOperationalSummaries(
+    input: ListOperationalSummariesInput
+  ): Promise<ListOperationalSummariesResult> {
+    const q = normalizeText(input.q);
+    const responsableUserId = normalizeText(input.responsableUserId);
+    const estadoGlobalRaw = normalizeText(input.estadoGlobal);
+    let estadoGlobal: EstadoExpedienteGlobal | null = null;
+
+    if (estadoGlobalRaw && !isEstadoExpedienteGlobal(estadoGlobalRaw)) {
+      throw new ExpedienteServiceError("estadoGlobal invalido.", 400);
+    }
+    if (estadoGlobalRaw) {
+      estadoGlobal = estadoGlobalRaw as EstadoExpedienteGlobal;
+    }
+
+    const where: Prisma.ExpedienteWhereInput = {
+      deletedAt: null
+    };
+
+    if (estadoGlobal) {
+      where.estadoGlobal = estadoGlobal;
+    }
+
+    if (responsableUserId) {
+      where.profesionalResponsableId = responsableUserId;
+    }
+
+    if (q) {
+      where.OR = [
+        { id: { contains: q, mode: "insensitive" } },
+        { codigoInterno: { contains: q, mode: "insensitive" } },
+        { nombreProyecto: { contains: q, mode: "insensitive" } }
+      ];
+    }
+
+    const [total, rows] = await Promise.all([
+      prisma.expediente.count({ where }),
+      prisma.expediente.findMany({
+        where,
+        skip: (input.page - 1) * input.pageSize,
+        take: input.pageSize,
+        orderBy: [
+          { updatedAt: "desc" },
+          { createdAt: "desc" }
+        ],
+        select: {
+          id: true,
+          codigoInterno: true,
+          estadoGlobal: true,
+          nombreProyecto: true,
+          updatedAt: true,
+          profesionalResponsable: {
+            select: {
+              id: true,
+              fullName: true
+            }
+          },
+          etapas: {
+            select: {
+              id: true,
+              tipoEtapa: true,
+              estadoEtapa: true,
+              dueAt: true,
+              responsable: {
+                select: {
+                  id: true,
+                  fullName: true
+                }
+              }
+            },
+            orderBy: {
+              createdAt: "asc"
+            }
+          },
+          _count: {
+            select: {
+              alertas: {
+                where: {
+                  status: EstadoAlerta.ACTIVA,
+                  blocking: true
+                }
+              },
+              noConformidades: {
+                where: {
+                  deletedAt: null,
+                  status: {
+                    in: [EstadoNoConformidad.ABIERTA, EstadoNoConformidad.EN_PROCESO]
+                  },
+                  severity: {
+                    in: [SeveridadNC.MAYOR, SeveridadNC.CRITICA]
+                  }
+                }
+              }
+            }
+          }
+        }
+      })
+    ]);
+
+    const items = rows.map((row) =>
+      buildOperationalSummary({
+        expedienteId: row.id,
+        codigoInterno: row.codigoInterno,
+        estadoGlobal: row.estadoGlobal,
+        nombreProyecto: row.nombreProyecto,
+        profesionalResponsable: row.profesionalResponsable,
+        etapas: row.etapas,
+        blockingAlertsCount: row._count.alertas,
+        blockingNcCount: row._count.noConformidades,
+        updatedAt: row.updatedAt
+      })
+    );
+
+    const totalPages = total === 0 ? 0 : Math.ceil(total / input.pageSize);
+
+    return {
+      pagination: {
+        page: input.page,
+        pageSize: input.pageSize,
+        total,
+        totalPages,
+        hasNext: input.page * input.pageSize < total
+      },
+      items
+    };
+  },
+
   async getStateHistory(input: GetStateHistoryInput): Promise<GetStateHistoryResult> {
     const expediente = await prisma.expediente.findFirst({
       where: {

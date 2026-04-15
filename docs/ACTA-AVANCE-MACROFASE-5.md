@@ -1,0 +1,161 @@
+# ACTA DE AVANCE - MACROFASE 5
+
+## Fecha
+2026-04-15
+
+## Estado general
+
+- MacroFase 5: INICIADA
+- Bloque de arranque: M5-A1 / M5-B1 / M5-C1 (planificacion base)
+
+## Hito de inicio M5
+
+Se aprueba inicio formal de MacroFase 5 con enfoque en estabilizacion preproductiva y salida a piloto controlado.
+
+### Documento rector aprobado
+
+1. `docs/PROPUESTA-INICIAL-MACROFASE-5.md`
+
+### Decision de direccion
+
+1. Mantener alcance funcional anclado en F1-F5.
+2. Priorizar robustez operativa, calidad de datos y readiness de release candidate.
+3. Exigir evidencia objetiva por bloque antes de avanzar de fase.
+
+## Entregables de arranque comprometidos (M5-S1)
+
+1. `M5-A1-01`: matriz de brechas operativas F1-F5.
+2. `M5-B1-01`: especificacion de dataset operativo oficial.
+3. `M5-B1-02`: flujo/script de refresh dataset QA/UAT.
+4. `M5-C1-01`: checklist RC v1 con gates y evidencia.
+
+## Criterio de control de avance M5
+
+1. Ningun bloque se cierra sin evidencia tecnica ejecutada.
+2. Cambios de alcance deben quedar explicitamente aprobados en acta.
+3. Cada iteracion debe registrar riesgos, mitigacion y siguiente paso.
+
+## Siguiente punto
+
+Ejecutar `M5-A1-01`: construir matriz de brechas operativas F1-F5 (severidad, impacto, accion y prioridad).
+
+## Actualizacion M5-A1-01 (matriz de brechas operativas F1-F5)
+
+Se ejecuta inventario estructurado de brechas operativas sobre el baseline F1-F5.
+
+### Entregable
+
+1. `docs/M5-A1-01-MATRIZ-BRECHAS-OPERATIVAS-F1-F5.md`
+
+### Resultado
+
+1. Brechas identificadas y priorizadas por severidad/impacto/accion/prioridad.
+2. Priorizacion consolidada P1/P2/P3 definida para ejecucion por bloques.
+3. Secuencia recomendada de cierre enlazada a M5-B1, M5-C1 y M5-A2.
+
+Estado:
+
+- M5-A1-01: **IMPLEMENTADO**.
+
+## Siguiente punto
+
+Ejecutar `M5-B1-01`: especificacion formal de dataset operativo oficial (casos, objetivos de validacion, expected outcomes).
+
+## Actualizacion M5-B1-01 (dataset operativo oficial QA/UAT)
+
+Se ejecuta especificacion formal del dataset operativo para validacion de F1-F5.
+
+### Entregable
+
+1. `docs/M5-B1-01-DATASET-OPERATIVO-OFICIAL.md`
+
+### Resultado
+
+1. Casos oficiales definidos con IDs, precondiciones y expected outcomes.
+2. Criterios de refresh establecidos (`db:seed` / `db:reset + db:seed`).
+3. Criterios de aceptacion post-refresh y evidencia minima por ciclo QA/UAT definidos.
+4. Versionado de dataset operativo oficial establecido (`v1.0-M5`).
+
+Estado:
+
+- M5-B1-01: **IMPLEMENTADO**.
+
+## Siguiente punto
+
+Ejecutar `M5-B1-02`: definir flujo operativo de refresh dataset QA/UAT (procedimiento ejecutable + checklist de control).
+
+## Actualizacion M5-B1-02 (estandar de refresh dataset QA/UAT)
+
+Se ejecuta estandarizacion del refresh operativo para evitar deriva entre ciclos.
+
+### Entregables
+
+1. Documento operativo:
+- `docs/M5-B1-02-REFRESH-DATASET-QA-UAT.md`
+
+2. Script reusable:
+- `scripts/refresh-dataset-qa.ps1`
+
+3. Comandos estandar en `package.json`:
+- `pnpm dataset:refresh`
+- `pnpm dataset:refresh:full`
+
+### Resultado
+
+1. Flujo de refresh unificado y versionado.
+2. Checklist de control por corrida definido.
+3. Criterios de consistencia QA/UAT formalizados.
+
+Estado:
+
+- M5-B1-02: **IMPLEMENTADO**.
+
+## Siguiente punto
+
+Ejecutar `M5-C1-01`: checklist RC v1 (gates obligatorios + evidencia por flujo F1-F5).
+
+## Actualizacion M5-C1-01 (checklist RC v1)
+
+Se ejecuta definicion de checklist RC con gates obligatorios para control de salida.
+
+### Entregable
+
+1. `docs/M5-C1-01-CHECKLIST-RC-V1.md`
+
+### Resultado
+
+1. Gates P1/P2 definidos con criterio PASS/FAIL.
+2. Evidencia minima por flujo F1-F5 establecida.
+3. Plantilla de evidencia por corrida RC incluida.
+4. Decision gate final RC formalizada (Gate 6).
+
+Estado:
+
+- M5-C1-01: **IMPLEMENTADO**.
+
+## Siguiente punto
+
+Ejecutar `M5-A2-01`: hardening funcional P1 (BR-001/002/003/006/008) con plan de cambios backend/UI.
+
+## Actualizacion M5-A2-01 (plan de cambios backend/UI P1)
+
+Se ejecuta definicion del plan tecnico de implementacion para BR-001/002/003/006/008.
+
+### Entregable
+
+1. `docs/M5-A2-01-PLAN-CAMBIOS-BACKEND-UI.md`
+
+### Resultado
+
+1. Diseño de cambios API/UI definido por brecha.
+2. Secuencia de implementacion establecida (backend primero, luego UI y validacion).
+3. Plan de pruebas y criterio de aceptación M5-A2-01 documentados.
+4. Riesgos tecnicos de implementacion identificados con mitigacion.
+
+Estado:
+
+- M5-A2-01: **PLAN DEFINIDO, LISTO PARA IMPLEMENTACION**.
+
+## Siguiente punto
+
+Ejecutar `M5-A2-02`: implementación incremental (API A1/A2 + UI B3/B5/B4 + sesión B1/B2) con validación técnica por bloque.

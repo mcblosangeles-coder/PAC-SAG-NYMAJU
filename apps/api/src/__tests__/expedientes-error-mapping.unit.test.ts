@@ -15,8 +15,11 @@ describe("expedientes error mapping", () => {
     assert.equal(mapExpedienteServiceStatusToErrorCode(422), "UNPROCESSABLE_ENTITY");
   });
 
+  it("maps 400 to INVALID_PARAM", () => {
+    assert.equal(mapExpedienteServiceStatusToErrorCode(400), "INVALID_PARAM");
+  });
+
   it("maps unknown status to INTERNAL_ERROR", () => {
-    assert.equal(mapExpedienteServiceStatusToErrorCode(400), "INTERNAL_ERROR");
     assert.equal(mapExpedienteServiceStatusToErrorCode(500), "INTERNAL_ERROR");
     assert.equal(mapExpedienteServiceStatusToErrorCode(503), "INTERNAL_ERROR");
   });

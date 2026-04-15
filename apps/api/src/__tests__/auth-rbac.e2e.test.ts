@@ -62,6 +62,47 @@ type WorkflowDeps = {
 
 type ExpedientesDeps = {
   expedientesService: {
+    listOperationalSummaries: (input: {
+      q?: string | null;
+      estadoGlobal?: string | null;
+      responsableUserId?: string | null;
+      page: number;
+      pageSize: number;
+    }) => Promise<{
+      pagination: {
+        page: number;
+        pageSize: number;
+        total: number;
+        totalPages: number;
+        hasNext: boolean;
+      };
+      items: Array<{
+        expedienteId: string;
+        codigoInterno: string;
+        estadoGlobal: string;
+        proyecto: {
+          id: string;
+          nombre: string;
+        } | null;
+        responsableActual: {
+          userId: string;
+          fullName: string;
+        } | null;
+        etapasResumen: Array<{
+          id: string;
+          tipoEtapa: string;
+          estadoEtapa: string;
+          dueAt: Date | null;
+        }>;
+        bloqueos: {
+          hasBlockingAlerts: boolean;
+          hasBlockingNc: boolean;
+          count: number;
+        };
+        canAdvance: boolean;
+        updatedAt: Date;
+      }>;
+    }>;
     getStateHistory: (input: {
       expedienteId: string;
       page: number;
@@ -180,6 +221,7 @@ describe("Auth + RBAC middleware integration", async () => {
   const originalHasPermission = securityDeps.permissionsService.hasPermission;
   const originalEvaluateExpedienteAccess = scopeDeps.scopePolicy.evaluateExpedienteAccess;
   const originalGetWorkflow = workflowDeps.workflowService.getWorkflow;
+  const originalListOperationalSummaries = expedientesDeps.expedientesService.listOperationalSummaries;
   const originalGetStateHistory = expedientesDeps.expedientesService.getStateHistory;
   const originalGetOperationalSummary = expedientesDeps.expedientesService.getOperationalSummary;
   const originalChangeState = expedientesDeps.expedientesService.changeState;
@@ -221,6 +263,38 @@ describe("Auth + RBAC middleware integration", async () => {
       hasBlockingAlerts: false,
       hasBlockingNc: false,
       canAdvance: true
+    });
+    expedientesDeps.expedientesService.listOperationalSummaries = async (input) => ({
+      pagination: {
+        page: input.page,
+        pageSize: input.pageSize,
+        total: 1,
+        totalPages: 1,
+        hasNext: false
+      },
+      items: [
+        {
+          expedienteId: "EXP-001",
+          codigoInterno: "PAC-2026-001",
+          estadoGlobal: "DOCUMENTAL",
+          proyecto: {
+            id: "PROJ-01",
+            nombre: "Proyecto A"
+          },
+          responsableActual: {
+            userId: "USR-01",
+            fullName: "Nombre Usuario"
+          },
+          etapasResumen: [],
+          bloqueos: {
+            hasBlockingAlerts: false,
+            hasBlockingNc: false,
+            count: 0
+          },
+          canAdvance: true,
+          updatedAt: new Date("2026-04-13T20:00:00.000Z")
+        }
+      ]
     });
     expedientesDeps.expedientesService.getStateHistory = async (input) => ({
       expedienteId: input.expedienteId,
@@ -285,6 +359,7 @@ describe("Auth + RBAC middleware integration", async () => {
     securityDeps.permissionsService.hasPermission = originalHasPermission;
     scopeDeps.scopePolicy.evaluateExpedienteAccess = originalEvaluateExpedienteAccess;
     workflowDeps.workflowService.getWorkflow = originalGetWorkflow;
+    expedientesDeps.expedientesService.listOperationalSummaries = originalListOperationalSummaries;
     expedientesDeps.expedientesService.getStateHistory = originalGetStateHistory;
     expedientesDeps.expedientesService.getOperationalSummary = originalGetOperationalSummary;
     expedientesDeps.expedientesService.changeState = originalChangeState;
@@ -318,6 +393,58 @@ describe("Auth + RBAC middleware integration", async () => {
     assert.equal(response.status, 200);
     const body = (await response.json()) as { expedienteId: string };
     assert.equal(body.expedienteId, "EXP-001");
+  });
+
+  it("returns 200 for expediente list endpoint with valid token and granted permission", async () => {
+    securityDeps.permissionsService.hasPermission = async () => true;
+    const response = await fetch(`${baseUrl}/api/v1/expedientes?page=1&pageSize=20`, {
+      headers: { Authorization: `Bearer ${signAccessToken()}` }
+    });
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as {
+      pagination: { page: number; pageSize: number; total: number };
+      items: Array<{ expedienteId: string }>;
+    };
+    assert.equal(body.pagination.page, 1);
+    assert.equal(body.pagination.pageSize, 20);
+    assert.equal(body.pagination.total, 1);
+    assert.equal(body.items[0]?.expedienteId, "EXP-001");
+  });
+
+  it("returns 400 for expediente list endpoint when query params are invalid", async () => {
+    securityDeps.permissionsService.hasPermission = async () => true;
+    const response = await fetch(`${baseUrl}/api/v1/expedientes?page=0&pageSize=200`, {
+      headers: { Authorization: `Bearer ${signAccessToken()}` }
+    });
+    assert.equal(response.status, 400);
+    const body = (await response.json()) as { code?: string; message?: string };
+    assert.equal(body.code, "INVALID_PARAM");
+    assert.equal(typeof body.message, "string");
+  });
+
+  it("returns 400 for expediente list endpoint when estadoGlobal filter is invalid", async () => {
+    securityDeps.permissionsService.hasPermission = async () => true;
+    expedientesDeps.expedientesService.listOperationalSummaries = async () => {
+      throw new ExpedienteServiceError("estadoGlobal invalido.", 400);
+    };
+    const response = await fetch(`${baseUrl}/api/v1/expedientes?estadoGlobal=ESTADO_INVALIDO`, {
+      headers: { Authorization: `Bearer ${signAccessToken()}` }
+    });
+    assert.equal(response.status, 400);
+    const body = (await response.json()) as { code?: string; message?: string };
+    assert.equal(body.code, "INVALID_PARAM");
+    assert.equal(typeof body.message, "string");
+  });
+
+  it("returns 403 for expediente list endpoint when permission is missing", async () => {
+    securityDeps.permissionsService.hasPermission = async () => false;
+    const response = await fetch(`${baseUrl}/api/v1/expedientes?page=1&pageSize=20`, {
+      headers: { Authorization: `Bearer ${signAccessToken()}` }
+    });
+    assert.equal(response.status, 403);
+    const body = (await response.json()) as { code?: string; message?: string };
+    assert.equal(body.code, "FORBIDDEN");
+    assert.equal(typeof body.message, "string");
   });
 
   it("returns 200 for state history endpoint with valid token and granted permission", async () => {
@@ -590,6 +717,16 @@ describe("Auth + RBAC middleware integration", async () => {
     assert.equal(response.status, 401);
     const body = (await response.json()) as { code?: string; message?: string };
     assert.equal(body.code, "UNAUTHENTICATED");
+    assert.equal(typeof body.message, "string");
+  });
+
+  it("returns NOT_FOUND on auth me when token user does not exist", async () => {
+    const response = await fetch(`${baseUrl}/api/v1/auth/me`, {
+      headers: { Authorization: `Bearer ${signAccessToken("usr-not-found-e2e")}` }
+    });
+    assert.equal(response.status, 404);
+    const body = (await response.json()) as { code?: string; message?: string };
+    assert.equal(body.code, "NOT_FOUND");
     assert.equal(typeof body.message, "string");
   });
 

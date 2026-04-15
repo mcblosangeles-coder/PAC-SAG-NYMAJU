@@ -26,6 +26,14 @@ const bodyString = (value: unknown): string | null => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
+const queryToOptionalString = (value: string | string[] | undefined): string | null => {
+  if (typeof value === "undefined") return null;
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 const queryToPositiveInt = (
   value: string | string[] | undefined,
   fallback: number,
@@ -46,6 +54,44 @@ const queryToScope = (value: string | string[] | undefined): "all" | "global" | 
   if (raw === "all" || raw === "global" || raw === "stage") return raw;
   return null;
 };
+
+expedientesRouter.get("/", authorize("workflow.read"), async (req, res) => {
+  try {
+    const page = queryToPositiveInt(req.query.page as string | string[] | undefined, 1);
+    const pageSize = queryToPositiveInt(req.query.pageSize as string | string[] | undefined, 20);
+
+    if (!page || !pageSize) {
+      return sendApiError(res, 400, API_ERROR_CODE.invalidParam, "Parametros de consulta invalidos.");
+    }
+
+    const result = await expedientesService.listOperationalSummaries({
+      q: queryToOptionalString(req.query.q as string | string[] | undefined),
+      estadoGlobal: queryToOptionalString(req.query.estadoGlobal as string | string[] | undefined),
+      responsableUserId: queryToOptionalString(
+        req.query.responsableUserId as string | string[] | undefined
+      ),
+      page,
+      pageSize
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof ExpedienteServiceError) {
+      return sendApiError(
+        res,
+        error.statusCode,
+        mapExpedienteServiceStatusToErrorCode(error.statusCode),
+        error.message
+      );
+    }
+    return sendApiError(
+      res,
+      500,
+      API_ERROR_CODE.internalError,
+      "No fue posible obtener el listado operativo de expedientes."
+    );
+  }
+});
 
 expedientesRouter.get(
   "/:id/history",

@@ -129,6 +129,9 @@ authRouter.get("/me", async (req, res) => {
     return res.status(200).json(user);
   } catch (error) {
     if (error instanceof AuthError) {
+      if (error.statusCode === 404) {
+        return sendApiError(res, 404, API_ERROR_CODE.notFound, error.message);
+      }
       return sendApiError(res, error.statusCode, API_ERROR_CODE.unauthenticated, error.message);
     }
     return sendApiError(res, 401, API_ERROR_CODE.unauthenticated, "Token invalido o expirado.");

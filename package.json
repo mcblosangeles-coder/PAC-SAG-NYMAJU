@@ -17,6 +17,8 @@
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
     "db:init": "pnpm db:generate && pnpm db:migrate && pnpm db:seed",
+    "dataset:refresh": "powershell -ExecutionPolicy Bypass -File ./scripts/refresh-dataset-qa.ps1 -Mode standard",
+    "dataset:refresh:full": "powershell -ExecutionPolicy Bypass -File ./scripts/refresh-dataset-qa.ps1 -Mode full",
     "docker:up": "docker compose -f infra/compose/docker-compose.yml up -d",
     "docker:down": "docker compose -f infra/compose/docker-compose.yml down",
     "docker:logs": "docker compose -f infra/compose/docker-compose.yml logs -f",
