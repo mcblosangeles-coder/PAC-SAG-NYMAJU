@@ -12,6 +12,23 @@
 
 Se aprueba inicio formal de MacroFase 5 con enfoque en estabilizacion preproductiva y salida a piloto controlado.
 
+## Inicio formal M5-A1 (definicion de base)
+
+Se ejecuta inicio formal de M5-A1 con definicion explicita de:
+
+1. objetivo de bloque,
+2. alcance en/fuera,
+3. criterios de salida,
+4. backlog priorizado P1/P2/P3.
+
+### Entregable
+
+1. `docs/M5-A1-00-DEFINICION-BASE.md`
+
+### Estado
+
+- M5-A1: **INICIADO Y DOCUMENTADO**.
+
 ### Documento rector aprobado
 
 1. `docs/PROPUESTA-INICIAL-MACROFASE-5.md`
