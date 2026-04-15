@@ -315,3 +315,27 @@ Estado:
 ## Siguiente paso
 
 Ejecutar `M5-E1-02`: ventana de observacion con trafico funcional limpio para snapshot `steady-state` y cierre operativo del bloque.
+
+## Cierre M5-E1-02 (ventana steady-state y cierre de bloque)
+
+Fecha cierre: 2026-04-15
+
+Se ejecuta ventana limpia de 10 minutos con trafico funcional (`health` + `metrics`) y captura de evidencias de monitoreo.
+
+### Entregable
+
+1. `docs/M5-E1-02-VENTANA-STEADY-STATE.md`
+
+### Resultado
+
+1. Ventana 10 min: `200/200` en todos los ciclos.
+2. Snapshot de proceso al cierre: `isHealthy=true`, `error_rate=0`, `requests5xxTotal=0`.
+3. `alerts` permanece `degraded` por agregado historico 24h/7d (trafico de pruebas negativas previo), no por degradacion de la ventana limpia.
+
+Estado:
+
+- M5-E1: **CERRADO FORMALMENTE**.
+
+## Siguiente bloque
+
+Iniciar `M5-F1` (endurecimiento de lectura operativa de alertas historicas y preparacion de salida controlada siguiente).
