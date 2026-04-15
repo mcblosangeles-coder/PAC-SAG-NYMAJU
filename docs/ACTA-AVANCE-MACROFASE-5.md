@@ -445,3 +445,5 @@ Pendiente no bloqueante para cierre definitivo en entorno real:
 ## Siguiente bloque
 
 Iniciar paquete final de salida de MacroFase 5 con enfoque en operacion sostenida y release controlado.
+
+- PND-M5-F2-PROD: validar borde real con 3 pruebas (400 inválido, 200 normal, metrics?profile=operational).
