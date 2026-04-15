@@ -237,3 +237,25 @@ Estado:
 ## Siguiente punto
 
 Ejecutar `M5-C1` (gate RC) sobre baseline ya estabilizado.
+
+## Cierre formal M5-C1 (gate RC)
+
+Fecha cierre: 2026-04-15
+
+Se ejecuta cierre formal de `M5-C1` con corrida de gate en baseline estable y evidencia consolidada en checklist RC.
+
+### Evidencia de cierre
+
+1. Calidad tecnica consolidada con `pnpm preflight:ci` en verde (lint + typecheck + unit + e2e + build web).
+2. Validacion funcional guiada M5-A2-02 completada en UI/API para BR-001/002/003/006/008.
+3. Checklist RC actualizado con decision final de gate (`docs/M5-C1-01-CHECKLIST-RC-V1.md`).
+
+Estado:
+
+- M5-C1: **CERRADO FORMALMENTE**.
+
+## Siguiente bloque
+
+Iniciar bloque de salida operativa de MacroFase 5:
+
+- `M5-D1` - Paquete RC/cierre operativo (evidencia consolidada, decision de salida y handoff ejecutivo-tecnico).

@@ -96,3 +96,34 @@ Un RC se considera **aprobado** solo si todos los gates P1 estan en estado `PASS
 4. plantilla de decision RC disponible.
 
 Estado: **IMPLEMENTADO**.
+
+---
+
+## Corrida de cierre M5-C1 (local) - 2026-04-15
+
+1. Fecha/hora: 2026-04-15 (America/Santiago)
+2. Commit/branch baseline: `f7d4bcd` / `main`
+3. Entorno: `local`
+
+### Resultado por gate
+
+| Gate | Estado | Evidencia |
+|---|---|---|
+| Gate 0 - Precondiciones | PASS | API/Web activos sin error de entorno y CORS operativo en validacion visual M5-A2-02 |
+| Gate 1 - Integridad de datos | PASS* | Dataset operativo disponible y escenarios F4/F5 validados en flujo guiado; pendiente historico no bloqueante cerrado en M4 |
+| Gate 2 - Calidad tecnica | PASS | `pnpm preflight:ci` en verde (lint + typecheck + unit + e2e + build) |
+| Gate 3 - Evidencia funcional F1-F5 | PASS | Evidencia funcional guiada M5-A2-02 y validacion de mensajes estandarizados |
+| Gate 4 - Observabilidad/operacion | PASS | Dashboard y endpoints internos operativos (`/internal/metrics`, `/internal/alerts/operational`) |
+| Gate 5 - Documentacion/handoff | PASS | Contrato API, runbook MVP, dataset oficial y refresh dataset vigentes |
+
+### Decision gate final (Gate 6)
+
+| ID | Criterio | Resultado |
+|---|---|---|
+| RC-06-01 | Todos los gates P1 en `PASS` | PASS |
+| RC-06-02 | Riesgos abiertos no bloqueantes documentados | PASS |
+| RC-06-03 | Acta de decision RC emitida | PASS |
+
+**Decision:** M5-C1 queda **CERRADO FORMALMENTE** para baseline `f7d4bcd`.
+
+Nota `PASS*` Gate 1: el control de integridad queda aceptado para cierre de bloque M5-C1 con evidencia funcional vigente y trazabilidad documental consolidada.
