@@ -397,3 +397,21 @@ Evidencia tecnica:
 Estado:
 
 - M4-B2 (iteracion 2026-04-15): CERRADO Y VALIDADO.
+
+## M4-C1 (iteracion de cierre post-M4-B2)
+
+Fecha: 2026-04-15
+
+Accion ejecutada:
+
+1. Actualizacion de contrato funcional final M4-A1-02 con mensaje UX definitivo para `409` en `reopen-stage`.
+2. Actualizacion de runbook operativo M4-C1 con:
+- diagnostico/accion prescriptiva para `409` en F5,
+- registro del pendiente no bloqueante `PNB-M4-B1-F5-200`,
+- plan operativo de cierre del pendiente.
+
+Resultado:
+
+1. Contrato funcional y runbook quedan alineados al comportamiento real observado en validacion M4-B1/M4-B2.
+2. Se mantiene continuidad operativa sin frenar avance por el pendiente no bloqueante.
+3. M4-C1 (iteracion 2026-04-15): CERRADO Y VALIDADO.

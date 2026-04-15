@@ -403,7 +403,7 @@ Este contrato adopta, ademas, el comportamiento UX accionable definido en M4-B2:
 
 2. `409 CONFLICT`
 - `change-state`: "Transicion de estado invalida. Revise secuencia permitida."
-- `reopen-stage`: "La etapa no puede reabrirse desde estado actual."
+- `reopen-stage`: "La etapa no puede reabrirse desde su estado actual. Use una etapa en estado `CERRADA|OBSERVADA|BLOQUEADA|VENCIDA|RECHAZADA`."
 
 3. `422 UNPROCESSABLE_ENTITY`
 - `change-state`: "Precondiciones no cumplidas. Revise bloqueos activos (alertas/NC)."

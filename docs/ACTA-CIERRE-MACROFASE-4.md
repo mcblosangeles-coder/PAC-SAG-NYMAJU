@@ -27,7 +27,7 @@
 
 1. API:
 - `pnpm.cmd --filter @pac/api typecheck` -> OK
-- `pnpm.cmd --filter @pac/api test:e2e` -> OK (`39/39`)
+- `pnpm.cmd --filter @pac/api test:e2e` -> OK (`43/43`)
 2. Web:
 - `pnpm.cmd --filter @pac/web typecheck` -> OK
 - `pnpm.cmd --filter @pac/web build` -> OK
@@ -65,43 +65,24 @@ Se considera MacroFase 4 cerrada cuando:
 - Impacto: variabilidad de casos limite no totalmente cubierta en UI.
 - Mitigacion: ampliar dataset de escenarios (bloqueos, estados, etapas presentes/ausentes).
 
-## 3.1) Mitigacion ejecutada de riesgos M4 (post-cierre)
+## 3.1) Estado vigente del riesgo no bloqueante (actualizado 2026-04-15)
 
-Fecha mitigacion: 2026-04-15
+ID de control: `PNB-M4-B1-F5-200`
 
-1. Riesgo F5 sin evidencia de camino `200`:
-- Mitigado con dataset semilla M4 que incluye expediente `PAC-VERIF-001` con etapa `REVISION_TECNICA` en estado `CERRADA`, habilitando `reopen-stage` exitoso (`200`).
+Estado: ABIERTO (no bloqueante)
 
-2. Riesgo de dependencia de token manual en UI:
-- Mitigado con login operativo integrado en la UI M4-B1 (`email/password -> access token`) para eliminar dependencia de pegado manual en pruebas.
+Detalle:
+1. Se valida correctamente manejo de error F5 (`409 CONFLICT`) en UI/API.
+2. Permanece pendiente evidencia dirigida de camino `200` para `reopen-stage` en entorno local actual.
 
-3. Riesgo por cobertura limitada de dataset:
-- Mitigado con dataset expandido de 3 expedientes operativos:
-  - `PAC-VERIF-001` (flujo F5 positivo),
-  - `PAC-VERIF-002` (bloqueo activo para validar `422` en F4),
-  - `PAC-VERIF-003` (consulta F2/F3 base).
-
-Estado residual actualizado:
-- Riesgo 1: Bajo (controlado por dataset reproducible).
-- Riesgo 2: Bajo (login UI operativo disponible).
-- Riesgo 3: Bajo (cobertura minima de escenarios ya instalada).
-
-### Evidencia ejecutada de mitigacion
-
-1. Seed de dataset M4:
-- `pnpm.cmd db:seed` -> OK, incluyendo `dataset de validacion M4`.
-
-2. Verificacion F5 camino positivo:
-- `POST /api/v1/expedientes/35b2a855-ccfb-4c0e-a9d3-fdd92bbc1431/reopen-stage`
-- Resultado: `200`, `estadoAnterior=CERRADA`, `estadoNuevo=REABIERTA`.
-
-3. Verificacion F4 precondicion de bloqueo:
-- `POST /api/v1/expedientes/b84fb315-bf65-40d4-86ff-6e4a52149965/change-state`
-- Resultado: `422 UNPROCESSABLE_ENTITY` por bloqueos activos.
-
-4. Validacion UI post-ajuste:
-- `pnpm.cmd --filter @pac/web typecheck` -> OK.
-- `pnpm.cmd --filter @pac/web build` -> OK.
+Plan de cierre operativo:
+1. Dueno: Backend/Data.
+2. Fecha objetivo: 2026-04-16.
+3. Acciones:
+- crear expediente semilla con etapa en estado reabrible,
+- ejecutar prueba dirigida F5 `200`,
+- anexar evidencia de UI/API en acta de avance,
+- cerrar `PNB-M4-B1-F5-200` sin reabrir el bloque M4-B1 completo.
 
 ## 4) Handoff a siguiente macrofase
 
@@ -124,9 +105,12 @@ Entregar una base MVP funcional trazable, con contrato y operacion documentada, 
 1. Ejecutar paquete de verificacion base:
 - `pnpm.cmd --filter @pac/api test:e2e`
 - `pnpm.cmd --filter @pac/web build`
-2. Completar evidencia de camino `200` para F5 con dataset preparado.
+2. Completar cierre del pendiente `PNB-M4-B1-F5-200` (evidencia de camino `200` en F5).
 3. Definir backlog de refinamiento UX/operacion sobre base M4 cerrada.
 
 ## 5) Decision de cierre
 
 MacroFase 4 queda **CERRADA FORMALMENTE**, con criterio de salida cumplido, riesgos residuales documentados y handoff listo para continuidad.
+
+Nota de gobierno:
+- El pendiente `PNB-M4-B1-F5-200` queda expresamente clasificado como no bloqueante y con plan de cierre trazable.

@@ -57,7 +57,8 @@ Diagnostico:
 
 Accion:
 1. revisar estado actual del expediente/etapa,
-2. ejecutar secuencia valida segun reglas del dominio.
+2. en `reopen-stage`, usar solo etapas con estado `CERRADA|OBSERVADA|BLOQUEADA|VENCIDA|RECHAZADA`,
+3. ejecutar secuencia valida segun reglas del dominio.
 
 ### 5) Error `UNPROCESSABLE_ENTITY` (422)
 
@@ -86,6 +87,22 @@ Accion:
 5. accion correctiva aplicada,
 6. resultado final.
 
+## Pendiente no bloqueante activo (controlado)
+
+ID: `PNB-M4-B1-F5-200`
+
+Estado: ABIERTO (no bloqueante)
+
+Contexto:
+1. En validacion funcional M4-B1 se verifico manejo correcto de error F5 (`409 CONFLICT`).
+2. Falta evidencia dirigida de camino positivo `200` para `reopen-stage` por dataset local no reabrible.
+
+Plan de cierre operativo:
+1. crear expediente semilla con etapa en estado reabrible,
+2. ejecutar prueba dirigida `POST /expedientes/:id/reopen-stage` con resultado `200`,
+3. adjuntar captura UI + salida API en acta,
+4. cerrar pendiente sin reabrir bloque M4-B1.
+
 ## Escalamiento
 
 Escalar a equipo backend cuando:
@@ -104,3 +121,6 @@ Escalar a equipo backend cuando:
 
 3. UX de errores:
 - `docs/M4-B2-ESTANDARIZACION-UX-ERRORES.md`
+
+4. Acta de seguimiento:
+- `docs/ACTA-AVANCE-MACROFASE-4.md`
