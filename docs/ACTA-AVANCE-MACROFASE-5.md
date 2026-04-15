@@ -290,3 +290,28 @@ Estado:
 ## Siguiente bloque
 
 Iniciar `M5-E1` (ejecucion de salida operativa controlada + seguimiento de riesgos residuales y evidencia de estabilidad post-RC).
+
+## Inicio M5-E1 (corrida controlada post-RC)
+
+Fecha registro: 2026-04-15
+
+Se ejecuta inicio formal de `M5-E1` con corrida controlada post-RC sobre baseline `c837dd9`.
+
+### Entregable
+
+1. `docs/M5-E1-CORRIDA-CONTROLADA-POST-RC.md`
+
+### Resultado de corrida inicial
+
+1. `preflight:local` en verde (`smoke + typecheck + unit + e2e`).
+2. `health` API en `ok`.
+3. Monitoreo interno con estado `degraded` por trafico de pruebas negativas (sin incremento de `5xx`).
+4. Lectura operativa: estabilidad tecnica base confirmada, con alerta operativa esperable por perfil de validacion.
+
+Estado:
+
+- M5-E1: **INICIADO (corrida 1 ejecutada y documentada)**.
+
+## Siguiente paso
+
+Ejecutar `M5-E1-02`: ventana de observacion con trafico funcional limpio para snapshot `steady-state` y cierre operativo del bloque.
