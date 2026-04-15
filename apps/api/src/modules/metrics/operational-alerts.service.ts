@@ -9,7 +9,11 @@ import { metricsHistoryService } from "./metrics-history.service";
 
 type RuleSeverity = "warning" | "critical";
 type AlertTransition = "triggered" | "resolved" | "ongoing";
-type RuleId = "error_rate_24h" | "p95_latency_24h" | "count_5xx_24h";
+type RuleId =
+  | "error_rate_24h"
+  | "p95_latency_24h"
+  | "count_5xx_24h"
+  | "profile_header_valid_rate_24h";
 
 type PaginationInput = {
   page: number;
@@ -38,7 +42,7 @@ type UnsilenceInput = {
 
 type OperationalAlertRule = {
   id: RuleId;
-  metric: "error_rate" | "p95_latency" | "5xx_count";
+  metric: "error_rate" | "p95_latency" | "5xx_count" | "profile_header_valid_rate";
   severity: RuleSeverity;
   message: string;
   evaluate: (summary: HistoricalSummary) => number;
@@ -51,6 +55,7 @@ type HistoricalSummary = {
   errorRate: number;
   p95Latency: number;
   count5xx: number;
+  profileHeaderValidRate: number;
 };
 
 type AlertState = {
@@ -98,6 +103,15 @@ const rules: OperationalAlertRule[] = [
     evaluate: (summary) => summary.count5xx,
     isBreached: (value) => value >= METRIC_THRESHOLDS["5xx_count"].max,
     thresholdLabel: `>=${METRIC_THRESHOLDS["5xx_count"].max}`
+  },
+  {
+    id: "profile_header_valid_rate_24h",
+    metric: "profile_header_valid_rate",
+    severity: "warning",
+    message: "SLO de etiquetado x-traffic-profile bajo umbral operativo.",
+    evaluate: (summary) => summary.profileHeaderValidRate,
+    isBreached: (value) => value < METRIC_THRESHOLDS.profile_header_valid_rate.max,
+    thresholdLabel: `<${METRIC_THRESHOLDS.profile_header_valid_rate.max}`
   }
 ];
 
@@ -118,7 +132,8 @@ const initialState = (): AlertState => ({
 const state: Record<RuleId, AlertState> = {
   error_rate_24h: initialState(),
   p95_latency_24h: initialState(),
-  count_5xx_24h: initialState()
+  count_5xx_24h: initialState(),
+  profile_header_valid_rate_24h: initialState()
 };
 
 let evaluatorInterval: NodeJS.Timeout | null = null;
@@ -355,8 +370,8 @@ export const operationalAlertsService = {
       lastEvaluationProfile = profile;
 
       if (summary.samples < MIN_SAMPLES_FOR_EVALUATION) {
-      lastEvaluationStatus = "insufficient_data";
-      lastEvaluationMessage = `Datos insuficientes para evaluar alertas (samples=${summary.samples}, profile=${profile}).`;
+        lastEvaluationStatus = "insufficient_data";
+        lastEvaluationMessage = `Datos insuficientes para evaluar alertas (samples=${summary.samples}, profile=${profile}).`;
         return;
       }
 

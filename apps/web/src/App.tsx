@@ -18,6 +18,7 @@ type MetricsSnapshot = {
 
 type AlertsStatus = {
   enabled: boolean;
+  profile?: "all" | "operational" | "validation";
   lastEvaluationAt: string | null;
   lastEvaluationStatus: "ok" | "degraded" | "insufficient_data" | "error";
   lastEvaluationMessage: string;
@@ -42,17 +43,20 @@ type AlertsStatus = {
 
 type MetricsHistory = {
   window: "24h" | "7d";
+  profile?: "all" | "operational" | "validation";
   points: Array<{
     at: string;
     errorRate: number;
     p95Latency: number;
     count5xx: number;
+    profileHeaderValidRate?: number;
   }>;
   summary: {
     samples: number;
     errorRate: number;
     p95Latency: number;
     count5xx: number;
+    profileHeaderValidRate?: number;
   };
 };
 
@@ -235,6 +239,7 @@ const INTERNAL_API_BASE_URL =
 const OPERATIONAL_API_BASE_URL =
   (import.meta.env.VITE_OPERATIONAL_API_BASE_URL as string | undefined)?.trim() ||
   "http://localhost:4000/api/v1";
+const OPERATIONAL_METRICS_PROFILE_QUERY = "profile=operational";
 
 const DEFAULT_AUTH_PROFILE: AuthProfile =
   (import.meta.env.PROD
@@ -649,10 +654,16 @@ function App() {
 
     try {
       const [snapshot, alerts, history24h, history7d] = await Promise.all([
-        fetchJson<MetricsSnapshot>("/metrics", metricsToken),
-        fetchJson<AlertsStatus>("/alerts/operational", metricsToken),
-        fetchJson<MetricsHistory>("/metrics/history?window=24h", metricsToken),
-        fetchJson<MetricsHistory>("/metrics/history?window=7d", metricsToken)
+        fetchJson<MetricsSnapshot>(`/metrics?${OPERATIONAL_METRICS_PROFILE_QUERY}`, metricsToken),
+        fetchJson<AlertsStatus>(`/alerts/operational?${OPERATIONAL_METRICS_PROFILE_QUERY}`, metricsToken),
+        fetchJson<MetricsHistory>(
+          `/metrics/history?window=24h&${OPERATIONAL_METRICS_PROFILE_QUERY}`,
+          metricsToken
+        ),
+        fetchJson<MetricsHistory>(
+          `/metrics/history?window=7d&${OPERATIONAL_METRICS_PROFILE_QUERY}`,
+          metricsToken
+        )
       ]);
 
       startTransition(() => {

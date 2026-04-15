@@ -8,7 +8,8 @@ import { API_ERROR_CODE, sendApiError } from "./lib/api-error";
 import { logger } from "./lib/logger";
 import {
   operationalMetricsService,
-  type TrafficProfile
+  type TrafficProfile,
+  type TrafficProfileHeaderStatus
 } from "./modules/metrics/operational-metrics.service";
 import { authRouter } from "./modules/auth/auth.routes";
 import { expedientesRouter } from "./routes/expedientes.routes";
@@ -30,13 +31,70 @@ const resolveRequestId = (requestIdHeader: string | undefined): string => {
   return normalized;
 };
 
-const resolveTrafficProfile = (
-  rawHeader: string | undefined
-): TrafficProfile => {
+const toPathname = (originalUrl: string): string => originalUrl.split("?")[0] ?? originalUrl;
+
+const resolveTrafficProfile = (input: {
+  rawHeader: string | undefined;
+  nodeEnv: "development" | "test" | "production";
+  forceValidation: boolean;
+}): { profile: TrafficProfile; headerStatus: TrafficProfileHeaderStatus; fromOverride: boolean } => {
+  const normalized = input.rawHeader?.trim().toLowerCase();
+  const headerStatus: TrafficProfileHeaderStatus =
+    !normalized ? "missing" : normalized === "validation" || normalized === "operational" ? "valid" : "invalid";
+
+  if (input.forceValidation) {
+    return { profile: "validation", headerStatus, fromOverride: true };
+  }
+
+  if (normalized === "validation") return { profile: "validation", headerStatus, fromOverride: false };
+  if (normalized === "operational") return { profile: "operational", headerStatus, fromOverride: false };
+  if (input.nodeEnv === "test") return { profile: "validation", headerStatus, fromOverride: false };
+  return { profile: "operational", headerStatus, fromOverride: false };
+};
+
+const isQaValidationRoute = (originalUrl: string): boolean => {
+  const pathname = toPathname(originalUrl);
+  return pathname.startsWith(env.qaInternalPathPrefix);
+};
+
+const isQaValidationHost = (hostname: string | undefined): boolean => {
+  if (!hostname) return false;
+  return env.qaInternalHostnames.includes(hostname.toLowerCase());
+};
+
+const shouldRejectByProfilePolicy = (
+  nodeEnv: "development" | "test" | "production",
+  headerStatus: TrafficProfileHeaderStatus
+): boolean => {
+  if (nodeEnv !== "production") return false;
+  if (headerStatus === "missing" && env.trafficProfileRejectOnMissingHeader) return true;
+  if (headerStatus === "invalid" && env.trafficProfileRejectOnInvalidHeader) return true;
+  return false;
+};
+
+const resolveRejectMessage = (headerStatus: TrafficProfileHeaderStatus): string => {
+  if (headerStatus === "missing") {
+    return "Header x-traffic-profile requerido en production (operational|validation).";
+  }
+  return "Header x-traffic-profile invalido. Use operational o validation.";
+};
+
+const resolveSecurityEvent = (headerStatus: TrafficProfileHeaderStatus): string => {
+  if (headerStatus === "missing") return "security.metrics_profile_missing";
+  if (headerStatus === "invalid") return "security.metrics_profile_invalid";
+  return "security.metrics_profile_valid";
+};
+
+const resolveSecurityMessage = (headerStatus: TrafficProfileHeaderStatus): string => {
+  if (headerStatus === "missing") return "Request without x-traffic-profile.";
+  if (headerStatus === "invalid") return "Request with invalid x-traffic-profile value.";
+  return "Request with valid x-traffic-profile value.";
+};
+
+const resolveHeaderValue = (rawHeader: string | undefined): string | null => {
   const normalized = rawHeader?.trim().toLowerCase();
-  if (normalized === "validation") return "validation";
-  if (normalized === "operational") return "operational";
-  return env.nodeEnv === "test" ? "validation" : "operational";
+  if (!normalized) return null;
+  return normalized;
 };
 
 export const createApp = (): express.Express => {
@@ -85,16 +143,52 @@ export const createApp = (): express.Express => {
   app.use((req, res, next) => {
     const startedAt = process.hrtime.bigint();
     const requestId = resolveRequestId(req.header("x-request-id") ?? undefined);
-    const trafficProfile = resolveTrafficProfile(req.header("x-traffic-profile") ?? undefined);
+    const rawTrafficProfileHeader = req.header("x-traffic-profile") ?? undefined;
+    const forceValidation =
+      isQaValidationRoute(req.originalUrl) || isQaValidationHost(req.hostname ?? undefined);
+    const resolvedProfile = resolveTrafficProfile({
+      rawHeader: rawTrafficProfileHeader,
+      nodeEnv: env.nodeEnv,
+      forceValidation
+    });
+    const trafficProfile = resolvedProfile.profile;
+    const profileHeaderStatus = resolvedProfile.headerStatus;
+
     res.setHeader("x-request-id", requestId);
     res.locals.requestId = requestId;
     res.locals.trafficProfile = trafficProfile;
+    res.locals.profileHeaderStatus = profileHeaderStatus;
+
+    if (env.nodeEnv === "production") {
+      if (profileHeaderStatus !== "valid") {
+        logger.warn(resolveSecurityEvent(profileHeaderStatus), resolveSecurityMessage(profileHeaderStatus), {
+          requestId,
+          method: req.method,
+          path: req.originalUrl,
+          hostname: req.hostname,
+          headerValue: resolveHeaderValue(rawTrafficProfileHeader),
+          forcedProfile: forceValidation
+        });
+      }
+      if (
+        !forceValidation &&
+        shouldRejectByProfilePolicy(env.nodeEnv, profileHeaderStatus)
+      ) {
+        return sendApiError(
+          res,
+          400,
+          API_ERROR_CODE.invalidParam,
+          resolveRejectMessage(profileHeaderStatus)
+        );
+      }
+    }
 
     logger.info("http.request.started", "Incoming API request.", {
       requestId,
       method: req.method,
       path: req.originalUrl,
-      trafficProfile
+      trafficProfile,
+      profileHeaderStatus
     });
 
     res.on("finish", () => {
@@ -107,7 +201,8 @@ export const createApp = (): express.Express => {
         path,
         statusCode: res.statusCode,
         durationMs: normalizedDurationMs,
-        trafficProfile
+        trafficProfile,
+        profileHeaderStatus
       });
 
       logger.info("http.request.completed", "API request completed.", {
@@ -116,7 +211,8 @@ export const createApp = (): express.Express => {
         path,
         statusCode: res.statusCode,
         durationMs: normalizedDurationMs,
-        trafficProfile
+        trafficProfile,
+        profileHeaderStatus
       });
     });
 
@@ -136,6 +232,7 @@ export const createApp = (): express.Express => {
   app.use(`${apiPrefix}/auth`, authRouter);
   app.use(`${apiPrefix}/expedientes`, expedientesRouter);
   app.use(`${apiPrefix}/internal`, internalRouter);
+  app.use(env.qaInternalPathPrefix, internalRouter);
 
   app.use((_req, res) => {
     sendApiError(res, 404, API_ERROR_CODE.notFound, "Endpoint no encontrado.");

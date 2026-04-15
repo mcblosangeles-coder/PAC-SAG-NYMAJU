@@ -4,10 +4,11 @@ type ThresholdKey =
   | "5xx_count"
   | "auth_refresh_failed_rate"
   | "audit_log_failed_count"
-  | "workflow_422_rate";
+  | "workflow_422_rate"
+  | "profile_header_valid_rate";
 
 type ThresholdDefinition = {
-  comparator: "lte" | "lt";
+  comparator: "lte" | "lt" | "gte" | "gt";
   max: number;
   unit: "ratio" | "ms" | "count";
 };
@@ -17,15 +18,20 @@ type HttpRequestMetricInput = {
   statusCode: number;
   durationMs: number;
   trafficProfile: TrafficProfile;
+  profileHeaderStatus: TrafficProfileHeaderStatus;
 };
 
 export type TrafficProfile = "operational" | "validation";
 export type MetricsProfile = "all" | TrafficProfile;
+export type TrafficProfileHeaderStatus = "valid" | "missing" | "invalid";
 
 export type OperationalMetricCounters = {
   requestsTotal: number;
   requestsErrorTotal: number;
   requests5xxTotal: number;
+  requestsProfileHeaderValidTotal: number;
+  requestsProfileHeaderMissingTotal: number;
+  requestsProfileHeaderInvalidTotal: number;
   authRefreshAttempts: number;
   authRefreshFailures: number;
   workflowChangeStateAttempts: number;
@@ -37,7 +43,7 @@ export type OperationalMetricCounters = {
 export type OperationalMetricStatus = {
   value: number;
   unit: "ratio" | "ms" | "count";
-  comparator: "lte" | "lt";
+  comparator: "lte" | "lt" | "gte" | "gt";
   threshold: number;
   isWithinThreshold: boolean;
 };
@@ -63,7 +69,8 @@ export const METRIC_THRESHOLDS: Record<ThresholdKey, ThresholdDefinition> = {
   "5xx_count": { comparator: "lt", max: 5, unit: "count" },
   auth_refresh_failed_rate: { comparator: "lte", max: 0.2, unit: "ratio" },
   audit_log_failed_count: { comparator: "lt", max: 1, unit: "count" },
-  workflow_422_rate: { comparator: "lte", max: 0.25, unit: "ratio" }
+  workflow_422_rate: { comparator: "lte", max: 0.25, unit: "ratio" },
+  profile_header_valid_rate: { comparator: "gte", max: 0.999, unit: "ratio" }
 };
 
 const round = (value: number, decimals = 4): number => {
@@ -84,6 +91,8 @@ const calculateP95 = (samples: number[]): number => {
 };
 
 const evaluateThreshold = (value: number, threshold: ThresholdDefinition): boolean => {
+  if (threshold.comparator === "gt") return value > threshold.max;
+  if (threshold.comparator === "gte") return value >= threshold.max;
   if (threshold.comparator === "lt") return value < threshold.max;
   return value <= threshold.max;
 };
@@ -94,6 +103,9 @@ const state = {
     requestsTotal: 0,
     requestsErrorTotal: 0,
     requests5xxTotal: 0,
+    requestsProfileHeaderValidTotal: 0,
+    requestsProfileHeaderMissingTotal: 0,
+    requestsProfileHeaderInvalidTotal: 0,
     authRefreshAttempts: 0,
     authRefreshFailures: 0,
     workflowChangeStateAttempts: 0,
@@ -106,6 +118,9 @@ const state = {
     requestsTotal: 0,
     requestsErrorTotal: 0,
     requests5xxTotal: 0,
+    requestsProfileHeaderValidTotal: 0,
+    requestsProfileHeaderMissingTotal: 0,
+    requestsProfileHeaderInvalidTotal: 0,
     authRefreshAttempts: 0,
     authRefreshFailures: 0,
     workflowChangeStateAttempts: 0,
@@ -118,6 +133,9 @@ const state = {
     requestsTotal: 0,
     requestsErrorTotal: 0,
     requests5xxTotal: 0,
+    requestsProfileHeaderValidTotal: 0,
+    requestsProfileHeaderMissingTotal: 0,
+    requestsProfileHeaderInvalidTotal: 0,
     authRefreshAttempts: 0,
     authRefreshFailures: 0,
     workflowChangeStateAttempts: 0,
@@ -147,13 +165,22 @@ const pushDuration = (
 
 const updateStateForRequest = (
   target: typeof state.all,
-  input: Omit<HttpRequestMetricInput, "trafficProfile">
+  input: HttpRequestMetricInput
 ): void => {
   const pathname = toPathname(input.path);
 
   target.requestsTotal += 1;
   if (input.statusCode >= 400) target.requestsErrorTotal += 1;
   if (input.statusCode >= 500) target.requests5xxTotal += 1;
+  if (input.profileHeaderStatus === "valid") {
+    target.requestsProfileHeaderValidTotal += 1;
+  }
+  if (input.profileHeaderStatus === "missing") {
+    target.requestsProfileHeaderMissingTotal += 1;
+  }
+  if (input.profileHeaderStatus === "invalid") {
+    target.requestsProfileHeaderInvalidTotal += 1;
+  }
 
   if (REFRESH_PATH_REGEX.test(pathname)) {
     target.authRefreshAttempts += 1;
@@ -192,7 +219,11 @@ export const operationalMetricsService = {
       "5xx_count": target.requests5xxTotal,
       auth_refresh_failed_rate: rate(target.authRefreshFailures, target.authRefreshAttempts),
       audit_log_failed_count: target.auditLogFailedCount,
-      workflow_422_rate: rate(target.workflowChangeState422, target.workflowChangeStateAttempts)
+      workflow_422_rate: rate(target.workflowChangeState422, target.workflowChangeStateAttempts),
+      profile_header_valid_rate: rate(
+        target.requestsProfileHeaderValidTotal,
+        target.requestsTotal
+      )
     };
 
     const statusByMetric = Object.fromEntries(
@@ -225,6 +256,9 @@ export const operationalMetricsService = {
         requestsTotal: target.requestsTotal,
         requestsErrorTotal: target.requestsErrorTotal,
         requests5xxTotal: target.requests5xxTotal,
+        requestsProfileHeaderValidTotal: target.requestsProfileHeaderValidTotal,
+        requestsProfileHeaderMissingTotal: target.requestsProfileHeaderMissingTotal,
+        requestsProfileHeaderInvalidTotal: target.requestsProfileHeaderInvalidTotal,
         authRefreshAttempts: target.authRefreshAttempts,
         authRefreshFailures: target.authRefreshFailures,
         workflowChangeStateAttempts: target.workflowChangeStateAttempts,

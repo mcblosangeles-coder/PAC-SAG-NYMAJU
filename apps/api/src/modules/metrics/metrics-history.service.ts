@@ -17,6 +17,7 @@ type HistoricalMetricPoint = {
   errorRate: number;
   p95Latency: number;
   count5xx: number;
+  profileHeaderValidRate: number;
 };
 
 const SOURCE_BY_PROFILE: Record<MetricsProfile, string> = {
@@ -68,6 +69,18 @@ const toDeltaCounters = (
   requestsTotal: toDelta(snapshot.counters.requestsTotal, lastPersisted?.requestsTotal),
   requestsErrorTotal: toDelta(snapshot.counters.requestsErrorTotal, lastPersisted?.requestsErrorTotal),
   requests5xxTotal: toDelta(snapshot.counters.requests5xxTotal, lastPersisted?.requests5xxTotal),
+  requestsProfileHeaderValidTotal: toDelta(
+    snapshot.counters.requestsProfileHeaderValidTotal,
+    lastPersisted?.requestsProfileHeaderValidTotal
+  ),
+  requestsProfileHeaderMissingTotal: toDelta(
+    snapshot.counters.requestsProfileHeaderMissingTotal,
+    lastPersisted?.requestsProfileHeaderMissingTotal
+  ),
+  requestsProfileHeaderInvalidTotal: toDelta(
+    snapshot.counters.requestsProfileHeaderInvalidTotal,
+    lastPersisted?.requestsProfileHeaderInvalidTotal
+  ),
   authRefreshAttempts: toDelta(
     snapshot.counters.authRefreshAttempts,
     lastPersisted?.authRefreshAttempts
@@ -112,6 +125,10 @@ const persistSnapshot = async (
     deltaCounters.authRefreshFailures,
     deltaCounters.authRefreshAttempts
   );
+  const profileHeaderValidRate = ratio(
+    deltaCounters.requestsProfileHeaderValidTotal,
+    deltaCounters.requestsTotal
+  );
   const workflow422Rate = ratio(
     deltaCounters.workflowChangeState422,
     deltaCounters.workflowChangeStateAttempts
@@ -129,6 +146,9 @@ const persistSnapshot = async (
       requestsTotal: deltaCounters.requestsTotal,
       requestsErrorTotal: deltaCounters.requestsErrorTotal,
       requests5xxTotal: deltaCounters.requests5xxTotal,
+      requestsProfileHeaderValidTotal: deltaCounters.requestsProfileHeaderValidTotal,
+      requestsProfileHeaderMissingTotal: deltaCounters.requestsProfileHeaderMissingTotal,
+      requestsProfileHeaderInvalidTotal: deltaCounters.requestsProfileHeaderInvalidTotal,
       authRefreshAttempts: deltaCounters.authRefreshAttempts,
       authRefreshFailures: deltaCounters.authRefreshFailures,
       workflowChangeAttempts: deltaCounters.workflowChangeStateAttempts,
@@ -136,6 +156,7 @@ const persistSnapshot = async (
       auditLogFailedCount: deltaCounters.auditLogFailedCount,
       p95LatencyMs: snapshot.metrics.p95_latency.value,
       errorRate,
+      profileHeaderValidRate,
       authRefreshFailedRate,
       workflow422Rate
     },
@@ -146,6 +167,9 @@ const persistSnapshot = async (
       requestsTotal: deltaCounters.requestsTotal,
       requestsErrorTotal: deltaCounters.requestsErrorTotal,
       requests5xxTotal: deltaCounters.requests5xxTotal,
+      requestsProfileHeaderValidTotal: deltaCounters.requestsProfileHeaderValidTotal,
+      requestsProfileHeaderMissingTotal: deltaCounters.requestsProfileHeaderMissingTotal,
+      requestsProfileHeaderInvalidTotal: deltaCounters.requestsProfileHeaderInvalidTotal,
       authRefreshAttempts: deltaCounters.authRefreshAttempts,
       authRefreshFailures: deltaCounters.authRefreshFailures,
       workflowChangeAttempts: deltaCounters.workflowChangeStateAttempts,
@@ -153,6 +177,7 @@ const persistSnapshot = async (
       auditLogFailedCount: deltaCounters.auditLogFailedCount,
       p95LatencyMs: snapshot.metrics.p95_latency.value,
       errorRate,
+      profileHeaderValidRate,
       authRefreshFailedRate,
       workflow422Rate
     }
@@ -172,6 +197,9 @@ const persistSnapshot = async (
     requestsTotal: snapshot.counters.requestsTotal,
     requestsErrorTotal: snapshot.counters.requestsErrorTotal,
     requests5xxTotal: snapshot.counters.requests5xxTotal,
+    requestsProfileHeaderValidTotal: snapshot.counters.requestsProfileHeaderValidTotal,
+    requestsProfileHeaderMissingTotal: snapshot.counters.requestsProfileHeaderMissingTotal,
+    requestsProfileHeaderInvalidTotal: snapshot.counters.requestsProfileHeaderInvalidTotal,
     authRefreshAttempts: snapshot.counters.authRefreshAttempts,
     authRefreshFailures: snapshot.counters.authRefreshFailures,
     workflowChangeStateAttempts: snapshot.counters.workflowChangeStateAttempts,
@@ -250,12 +278,17 @@ export const metricsHistoryService = {
       at: row.windowStart.toISOString(),
       errorRate: Number(row.errorRate),
       p95Latency: Number(row.p95LatencyMs),
-      count5xx: row.requests5xxTotal
+      count5xx: row.requests5xxTotal,
+      profileHeaderValidRate: Number(row.profileHeaderValidRate)
     }));
 
     const totalRequests = rows.reduce((acc, row) => acc + row.requestsTotal, 0);
     const totalErrors = rows.reduce((acc, row) => acc + row.requestsErrorTotal, 0);
     const total5xx = rows.reduce((acc, row) => acc + row.requests5xxTotal, 0);
+    const totalProfileHeaderValid = rows.reduce(
+      (acc, row) => acc + row.requestsProfileHeaderValidTotal,
+      0
+    );
     const p95Series = rows.map((row) => Number(row.p95LatencyMs));
 
     return {
@@ -268,7 +301,8 @@ export const metricsHistoryService = {
         samples: rows.length,
         errorRate: ratio(totalErrors, totalRequests),
         p95Latency: percentil95(p95Series),
-        count5xx: total5xx
+        count5xx: total5xx,
+        profileHeaderValidRate: ratio(totalProfileHeaderValid, totalRequests)
       }
     };
   }

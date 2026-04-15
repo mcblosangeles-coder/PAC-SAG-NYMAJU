@@ -3,6 +3,10 @@ type AppEnv = {
   port: number;
   trustProxy: boolean;
   trustedProxyCidrs: string[];
+  qaInternalHostnames: string[];
+  qaInternalPathPrefix: string;
+  trafficProfileRejectOnMissingHeader: boolean;
+  trafficProfileRejectOnInvalidHeader: boolean;
   apiPrefix: string;
   corsAllowedOrigins: string[];
   metricsToken: string | null;
@@ -103,6 +107,14 @@ const validateApiPrefix = (value: string | undefined): string => {
   return prefix;
 };
 
+const validatePathPrefix = (name: string, value: string | undefined, fallback: string): string => {
+  const prefix = value?.trim() || fallback;
+  if (!prefix.startsWith("/")) {
+    throw new Error(`Invalid ${name}: ${prefix}. It must start with '/'.`);
+  }
+  return prefix;
+};
+
 const parseRateLimitStore = (rawValue: string | undefined): "memory" | "redis" => {
   const normalized = rawValue?.trim().toLowerCase();
   if (!normalized || normalized.length === 0) return "redis";
@@ -168,10 +180,21 @@ const nodeEnv = toNodeEnv(process.env.NODE_ENV);
 const metricsToken = process.env.METRICS_TOKEN?.trim() || null;
 const trustProxy = toBoolean(process.env.TRUST_PROXY, nodeEnv === "production");
 const trustedProxyCidrs = parseCsv(process.env.TRUSTED_PROXY_CIDRS);
+const qaInternalHostnames = parseCsv(process.env.QA_INTERNAL_HOSTNAMES).map((hostname) =>
+  hostname.toLowerCase()
+);
 const rateLimitStore = parseRateLimitStore(process.env.RATE_LIMIT_STORE);
 const rateLimitRequireRedis = toBoolean(
   process.env.RATE_LIMIT_REQUIRE_REDIS,
   nodeEnv === "production"
+);
+const trafficProfileRejectOnMissingHeader = toBoolean(
+  process.env.TRAFFIC_PROFILE_REJECT_ON_MISSING_HEADER,
+  nodeEnv === "production"
+);
+const trafficProfileRejectOnInvalidHeader = toBoolean(
+  process.env.TRAFFIC_PROFILE_REJECT_ON_INVALID_HEADER,
+  true
 );
 
 if (nodeEnv === "production" && !metricsToken) {
@@ -187,6 +210,14 @@ export const env: AppEnv = {
   port: toPort(process.env.PORT, 4000),
   trustProxy,
   trustedProxyCidrs,
+  qaInternalHostnames,
+  qaInternalPathPrefix: validatePathPrefix(
+    "QA_INTERNAL_PATH_PREFIX",
+    process.env.QA_INTERNAL_PATH_PREFIX,
+    "/api/v1/internal/qa"
+  ),
+  trafficProfileRejectOnMissingHeader,
+  trafficProfileRejectOnInvalidHeader,
   apiPrefix: validateApiPrefix(process.env.API_PREFIX),
   corsAllowedOrigins: resolveCorsAllowedOrigins(
     nodeEnv,

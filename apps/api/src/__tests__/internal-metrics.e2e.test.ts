@@ -178,6 +178,30 @@ describe("Internal metrics endpoint", async () => {
     assert.equal(Array.isArray(body.points), true);
   });
 
+  it("keeps operational counters isolated from validation traffic", async () => {
+    const headers = { "x-metrics-token": process.env.METRICS_TOKEN as string };
+    const beforeResponse = await fetch(`${baseUrl}/api/v1/internal/metrics?profile=operational`, {
+      headers
+    });
+    assert.equal(beforeResponse.status, 200);
+    const beforeBody = (await beforeResponse.json()) as MetricsResponse;
+
+    const healthResponse = await fetch(`${baseUrl}/api/v1/health`);
+    assert.equal(healthResponse.status, 200);
+
+    const afterResponse = await fetch(`${baseUrl}/api/v1/internal/metrics?profile=operational`, {
+      headers
+    });
+    assert.equal(afterResponse.status, 200);
+    const afterBody = (await afterResponse.json()) as MetricsResponse;
+
+    assert.equal(
+      afterBody.counters.requestsTotal,
+      beforeBody.counters.requestsTotal,
+      "Validation traffic should not increment operational counters."
+    );
+  });
+
   it("returns 403 in operational alerts status when metrics token is missing", async () => {
     const response = await fetch(`${baseUrl}/api/v1/internal/alerts/operational`);
     assert.equal(response.status, 403);

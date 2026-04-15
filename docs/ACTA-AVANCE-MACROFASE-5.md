@@ -374,3 +374,74 @@ Estado:
 ## Siguiente bloque
 
 Preparar `M5-F2` para salida controlada siguiente (afinamiento de umbrales y operacion sobre perfil `operational`).
+
+## Cierre M5-F2 (eliminacion de riesgo por contaminacion de senal)
+
+Fecha cierre: 2026-04-15
+
+Se ejecuta hardening tecnico-operativo para eliminar riesgo de mezcla entre trafico operacional y de validacion.
+
+### Resultado por accion solicitada
+
+1. **Header forzado en borde**:
+- plantilla NGINX agrega `x-traffic-profile` forzado por host/ruta y evita sobrescritura externa.
+
+2. **Valores no permitidos bloqueados**:
+- borde y backend rechazan valores invalidos (`400`) fuera de `operational|validation`.
+
+3. **Ruta interna QA aislada**:
+- habilitada via `QA_INTERNAL_PATH_PREFIX` para trafico `validation`.
+
+4. **Default estricto en produccion**:
+- en produccion se registra `security.metrics_profile_missing` y se permite rechazo por politica.
+
+5. **Dashboards/alertas fijadas a operational**:
+- UI consulta endpoints internos con `profile=operational` como baseline de operacion.
+
+6. **SLO de etiquetado aplicado**:
+- nueva metrica `profile_header_valid_rate` con umbral `>= 0.999` y regla de alerta 24h.
+
+7. **Prueba anti-contaminacion**:
+- E2E valida aislamiento de contadores `operational` vs trafico `validation`.
+
+8. **Runbook operativo corto**:
+- emitido con verificacion diaria y manejo de desvios.
+
+### Evidencia tecnica de cierre
+
+1. `pnpm.cmd --filter @pac/api typecheck` -> OK.
+2. `pnpm.cmd --filter @pac/api test:e2e` -> OK (`46/46`).
+3. `pnpm.cmd --filter @pac/web build` -> OK.
+
+### Entregables
+
+1. `docs/M5-F2-RUNBOOK-OPERACION-PERFIL-METRICAS.md`
+2. `infra/proxy/nginx/traffic-profile.conf`
+3. Ajustes backend/UI de perfilado, SLO y alertas (M5-F2).
+
+Estado:
+
+- M5-F2: **CERRADO (IMPLEMENTADO + VALIDADO)**.
+
+### Validacion de borde (estado operativo actual)
+
+Estado actual: **VALIDACION LOCAL COMPLETADA / PRODUCCION PENDIENTE**.
+
+Evidencia local ejecutada (Docker + NGINX como borde):
+
+1. Rechazo de header invalido (`x-traffic-profile=bad_value`) -> `400`.
+2. Request normal a `health` via borde local -> `200`.
+3. Politica de inyeccion/rechazo desplegada y activa en borde local (`pac-nginx-edge`).
+
+Pendiente no bloqueante para cierre definitivo en entorno real:
+
+1. Desplegar misma politica en WAF/LB/Gateway productivo.
+2. Repetir pruebas de cierre en produccion:
+- Prueba A: invalido -> `400`.
+- Prueba B: normal -> `200`.
+- Prueba C: snapshot operacional -> `GET /api/v1/internal/metrics?profile=operational`.
+3. Registrar evidencia de esas 3 pruebas y cerrar riesgo residual en acta.
+
+## Siguiente bloque
+
+Iniciar paquete final de salida de MacroFase 5 con enfoque en operacion sostenida y release controlado.
