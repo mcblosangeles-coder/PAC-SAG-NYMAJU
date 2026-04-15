@@ -447,3 +447,7 @@ Pendiente no bloqueante para cierre definitivo en entorno real:
 Iniciar paquete final de salida de MacroFase 5 con enfoque en operacion sostenida y release controlado.
 
 - PND-M5-F2-PROD: validar borde real con 3 pruebas (400 inválido, 200 normal, metrics?profile=operational).
+
+- PLATAFORMA_BORDE_OBJETIVO=pendiente (temporal: nginx como referencia de implementación)
+- ACCESO_ADMIN_BORDE=pendiente (sin entorno productivo remoto)
+- VARIABLES_OBJETIVO_PROD=TRAFFIC_PROFILE_REJECT_ON_MISSING_HEADER=true; TRAFFIC_PROFILE_REJECT_ON_INVALID_HEADER=true; QA_INTERNAL_HOSTNAMES=<pendiente>; QA_INTERNAL_PATH_PREFIX=/api/v1/internal/qa
