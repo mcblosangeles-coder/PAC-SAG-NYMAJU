@@ -452,3 +452,8 @@ Iniciar paquete final de salida de MacroFase 5 con enfoque en operacion sostenid
 - ACCESO_ADMIN_BORDE=pendiente (sin entorno productivo remoto)
 - VARIABLES_OBJETIVO_PROD=TRAFFIC_PROFILE_REJECT_ON_MISSING_HEADER=true; TRAFFIC_PROFILE_REJECT_ON_INVALID_HEADER=true; QA_INTERNAL_HOSTNAMES=<pendiente>; QA_INTERNAL_PATH_PREFIX=/api/v1/internal/qa
 - DECISION_COSTO_M5-G1: se evita provisioning cloud por costo; se mantiene entorno local + cutover kit listo + pendiente PND-M5-F2-PROD abierto.
+
+## Inicio M5-H1 (estabilizacion operativa local y limpieza minima de deuda tecnica)
+
+- Estado: INICIADO
+- Enfoque: consolidar entorno local estable, eliminar artefactos temporales y dejar baseline limpio para continuidad.
