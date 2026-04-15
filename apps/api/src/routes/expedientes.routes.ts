@@ -81,7 +81,8 @@ expedientesRouter.get("/", authorize("workflow.read"), async (req, res) => {
         res,
         error.statusCode,
         mapExpedienteServiceStatusToErrorCode(error.statusCode),
-        error.message
+        error.message,
+        error.details ? { details: error.details } : undefined
       );
     }
     return sendApiError(
@@ -122,12 +123,13 @@ expedientesRouter.get(
       return res.status(200).json(history);
     } catch (error) {
       if (error instanceof ExpedienteServiceError) {
-        return sendApiError(
-          res,
-          error.statusCode,
-          mapExpedienteServiceStatusToErrorCode(error.statusCode),
-          error.message
-        );
+      return sendApiError(
+        res,
+        error.statusCode,
+        mapExpedienteServiceStatusToErrorCode(error.statusCode),
+        error.message,
+        error.details ? { details: error.details } : undefined
+      );
       }
       return sendApiError(
         res,
@@ -156,12 +158,13 @@ expedientesRouter.get(
       return res.status(200).json(summary);
     } catch (error) {
       if (error instanceof ExpedienteServiceError) {
-        return sendApiError(
-          res,
-          error.statusCode,
-          mapExpedienteServiceStatusToErrorCode(error.statusCode),
-          error.message
-        );
+      return sendApiError(
+        res,
+        error.statusCode,
+        mapExpedienteServiceStatusToErrorCode(error.statusCode),
+        error.message,
+        error.details ? { details: error.details } : undefined
+      );
       }
       return sendApiError(
         res,
@@ -190,12 +193,13 @@ expedientesRouter.get(
       return res.status(200).json(workflow);
     } catch (error) {
       if (error instanceof ExpedienteServiceError) {
-        return sendApiError(
-          res,
-          error.statusCode,
-          mapExpedienteServiceStatusToErrorCode(error.statusCode),
-          error.message
-        );
+      return sendApiError(
+        res,
+        error.statusCode,
+        mapExpedienteServiceStatusToErrorCode(error.statusCode),
+        error.message,
+        error.details ? { details: error.details } : undefined
+      );
       }
       return sendApiError(
         res,
@@ -244,12 +248,13 @@ expedientesRouter.post(
       });
     } catch (error) {
       if (error instanceof ExpedienteServiceError) {
-        return sendApiError(
-          res,
-          error.statusCode,
-          mapExpedienteServiceStatusToErrorCode(error.statusCode),
-          error.message
-        );
+      return sendApiError(
+        res,
+        error.statusCode,
+        mapExpedienteServiceStatusToErrorCode(error.statusCode),
+        error.message,
+        error.details ? { details: error.details } : undefined
+      );
       }
       return sendApiError(
         res,
@@ -299,12 +304,13 @@ expedientesRouter.post(
       });
     } catch (error) {
       if (error instanceof ExpedienteServiceError) {
-        return sendApiError(
-          res,
-          error.statusCode,
-          mapExpedienteServiceStatusToErrorCode(error.statusCode),
-          error.message
-        );
+      return sendApiError(
+        res,
+        error.statusCode,
+        mapExpedienteServiceStatusToErrorCode(error.statusCode),
+        error.message,
+        error.details ? { details: error.details } : undefined
+      );
       }
       return sendApiError(
         res,

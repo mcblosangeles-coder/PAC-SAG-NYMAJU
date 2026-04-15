@@ -603,7 +603,20 @@ describe("Auth + RBAC middleware integration", async () => {
     expedientesDeps.expedientesService.changeState = async () => {
       throw new ExpedienteServiceError(
         "Precondicion de workflow no cumplida: existen bloqueos activos para avanzar.",
-        422
+        422,
+        {
+          blockingAlertsCount: 1,
+          blockingNcCount: 0,
+          blockingReasons: [
+            {
+              type: "ALERTA",
+              id: "AL-001",
+              severity: "CRITICA",
+              title: "Alerta activa",
+              description: "Bloquea avance"
+            }
+          ]
+        }
       );
     };
 
@@ -617,9 +630,20 @@ describe("Auth + RBAC middleware integration", async () => {
     });
 
     assert.equal(response.status, 422);
-    const body = (await response.json()) as { code?: string; message?: string };
+    const body = (await response.json()) as {
+      code?: string;
+      message?: string;
+      details?: {
+        blockingAlertsCount?: number;
+        blockingNcCount?: number;
+        blockingReasons?: Array<{ type: string; id: string }>;
+      };
+    };
     assert.equal(body.code, "UNPROCESSABLE_ENTITY");
     assert.equal(typeof body.message, "string");
+    assert.equal(body.details?.blockingAlertsCount, 1);
+    assert.equal(body.details?.blockingNcCount, 0);
+    assert.equal(Array.isArray(body.details?.blockingReasons), true);
   });
 
   it("returns 200 for reopen-stage real endpoint", async () => {

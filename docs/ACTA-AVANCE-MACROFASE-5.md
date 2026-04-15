@@ -176,3 +176,64 @@ Estado:
 ## Siguiente punto
 
 Ejecutar `M5-A2-02`: implementación incremental (API A1/A2 + UI B3/B5/B4 + sesión B1/B2) con validación técnica por bloque.
+
+## Actualizacion M5-A2-02 (implementacion incremental P1)
+
+Se ejecuta M5-A2-02 sobre BR-001/002/003/006/008 con secuencia backend -> UI -> validacion tecnica.
+
+### Entregable
+
+1. `docs/M5-A2-02-IMPLEMENTACION-INCREMENTAL.md`
+
+### Resultado
+
+1. `BR-006` implementada en backend (`422` con `details` estructurado de bloqueos).
+2. `BR-001` implementada en UI (perfil `QA/PROD` y bloqueo de credenciales locales en `PROD`).
+3. `BR-002` implementada en UI (refresh token persistente + refresh automatico/preventivo).
+4. `BR-003` implementada en UI (bandeja por filtros contra `GET /expedientes`, con fallback IDs).
+5. `BR-008` implementada en UI (selector dinamico de etapas reabribles).
+
+### Evidencia tecnica
+
+1. `pnpm.cmd --filter @pac/api typecheck` -> OK.
+2. `pnpm.cmd --filter @pac/api test:e2e` -> OK (`43/43`).
+3. `pnpm.cmd --filter @pac/web typecheck` -> OK.
+4. `pnpm.cmd --filter @pac/web build` -> OK.
+
+Estado:
+
+- M5-A2-02: **IMPLEMENTADO Y VALIDADO TECNICAMENTE**.
+
+## Siguiente punto
+
+Ejecutar validacion funcional visual guiada de M5-A2-02 (modo filtros, refresh de sesion, acciones F4/F5) y consolidar cierre operativo del bloque.
+
+## Cierre operativo M5-A2-02 (validacion funcional visual guiada)
+
+Fecha cierre: 2026-04-15
+
+Resultado validacion:
+
+1. `BR-001` validado:
+- perfil `PROD` bloquea credenciales locales.
+- perfil `QA` permite login operativo y carga token.
+
+2. `BR-003` validado:
+- bandeja por filtros carga expedientes sin IDs manuales.
+
+3. `BR-008` validado:
+- selector dinamico de etapas en F5 y bloqueo correcto cuando no hay candidatas.
+
+4. `BR-006` validado:
+- `422` expone detalle de bloqueos en UI (`Bloqueos: ALERTA:...`).
+
+5. `BR-002` validado:
+- refresh automatico confirmado ante access token invalido (`Sesion renovada automaticamente.`).
+
+Estado:
+
+- M5-A2-02: **CERRADO Y VALIDADO (TECNICO + OPERATIVO)**.
+
+## Siguiente punto
+
+Ejecutar `M5-C1` (gate RC) sobre baseline ya estabilizado.

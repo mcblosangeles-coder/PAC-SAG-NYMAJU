@@ -16,7 +16,8 @@ import {
 export class ExpedienteServiceError extends Error {
   constructor(
     message: string,
-    public readonly statusCode: number
+    public readonly statusCode: number,
+    public readonly details?: Record<string, unknown>
   ) {
     super(message);
     this.name = "ExpedienteServiceError";
@@ -35,6 +36,15 @@ type ChangeStateResult = {
   expedienteId: string;
   estadoAnterior: EstadoExpedienteGlobal;
   estadoNuevo: EstadoExpedienteGlobal;
+};
+
+type BlockingReasonDetail = {
+  type: "ALERTA" | "NC";
+  id: string;
+  code?: string | null;
+  severity: string;
+  title: string;
+  description: string;
 };
 
 type ReopenStageInput = {
@@ -547,9 +557,75 @@ export const expedientesService = {
         ]);
 
         if (blockingAlertsCount > 0 || blockingNcCount > 0) {
+          const [blockingAlerts, blockingNc] = await Promise.all([
+            tx.alerta.findMany({
+              where: {
+                expedienteId: expediente.id,
+                status: EstadoAlerta.ACTIVA,
+                blocking: true
+              },
+              orderBy: {
+                createdAt: "desc"
+              },
+              take: 3,
+              select: {
+                id: true,
+                severity: true,
+                title: true,
+                description: true
+              }
+            }),
+            tx.noConformidad.findMany({
+              where: {
+                expedienteId: expediente.id,
+                deletedAt: null,
+                status: {
+                  in: [EstadoNoConformidad.ABIERTA, EstadoNoConformidad.EN_PROCESO]
+                },
+                severity: {
+                  in: [SeveridadNC.MAYOR, SeveridadNC.CRITICA]
+                }
+              },
+              orderBy: {
+                createdAt: "desc"
+              },
+              take: 3,
+              select: {
+                id: true,
+                codigo: true,
+                severity: true,
+                titulo: true,
+                descripcion: true
+              }
+            })
+          ]);
+
+          const blockingReasons: BlockingReasonDetail[] = [
+            ...blockingAlerts.map((alerta) => ({
+              type: "ALERTA" as const,
+              id: alerta.id,
+              severity: alerta.severity,
+              title: alerta.title,
+              description: alerta.description
+            })),
+            ...blockingNc.map((nc) => ({
+              type: "NC" as const,
+              id: nc.id,
+              code: nc.codigo,
+              severity: nc.severity,
+              title: nc.titulo,
+              description: nc.descripcion
+            }))
+          ];
+
           throw new ExpedienteServiceError(
             "Precondicion de workflow no cumplida: existen bloqueos activos para avanzar.",
-            422
+            422,
+            {
+              blockingAlertsCount,
+              blockingNcCount,
+              blockingReasons
+            }
           );
         }
       }

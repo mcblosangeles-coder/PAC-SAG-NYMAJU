@@ -90,11 +90,24 @@ type PaginatedResponse<T> = {
 type ApiErrorPayload = {
   code?: string;
   message?: string;
+  details?: {
+    blockingAlertsCount?: number;
+    blockingNcCount?: number;
+    blockingReasons?: Array<{
+      type: "ALERTA" | "NC";
+      id: string;
+      code?: string | null;
+      severity: string;
+      title: string;
+      description: string;
+    }>;
+  };
 };
 
 type LoginResponse = {
   tokens: {
     accessToken: string;
+    refreshToken: string;
   };
 };
 
@@ -202,6 +215,19 @@ type DashboardData = {
   history7d: MetricsHistory;
 };
 
+type AuthProfile = "QA" | "PROD";
+
+type ExpedienteListResponse = {
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+  };
+  items: ExpedienteSummary[];
+};
+
 const INTERNAL_API_BASE_URL =
   (import.meta.env.VITE_INTERNAL_API_BASE_URL as string | undefined)?.trim() ||
   "http://localhost:4000/api/v1/internal";
@@ -209,6 +235,14 @@ const INTERNAL_API_BASE_URL =
 const OPERATIONAL_API_BASE_URL =
   (import.meta.env.VITE_OPERATIONAL_API_BASE_URL as string | undefined)?.trim() ||
   "http://localhost:4000/api/v1";
+
+const DEFAULT_AUTH_PROFILE: AuthProfile =
+  (import.meta.env.PROD
+    ? "PROD"
+    : ((import.meta.env.VITE_AUTH_PROFILE_DEFAULT as string | undefined)?.trim().toUpperCase() ??
+        "QA")) === "PROD"
+    ? "PROD"
+    : "QA";
 
 const safeReadStoredToken = (): string => {
   try {
@@ -239,6 +273,39 @@ const safeStoreAccessToken = (token: string): void => {
     localStorage.setItem("pac.auth.accessToken", token);
   } catch {
     // noop
+  }
+};
+
+const safeReadStoredRefreshToken = (): string => {
+  try {
+    return localStorage.getItem("pac.auth.refreshToken")?.trim() || "";
+  } catch {
+    return "";
+  }
+};
+
+const safeStoreRefreshToken = (token: string): void => {
+  try {
+    localStorage.setItem("pac.auth.refreshToken", token);
+  } catch {
+    // noop
+  }
+};
+
+const decodeJwtExpMs = (token: string): number | null => {
+  const normalized = token.trim();
+  if (!normalized) return null;
+  const segments = normalized.split(".");
+  if (segments.length < 2) return null;
+
+  try {
+    const payload = JSON.parse(atob(segments[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as {
+      exp?: number;
+    };
+    if (typeof payload.exp !== "number") return null;
+    return payload.exp * 1000;
+  } catch {
+    return null;
   }
 };
 
@@ -330,14 +397,15 @@ const fetchJson = async <T,>(path: string, metricsToken: string): Promise<T> => 
 
 const parseApiError = async (
   response: Response
-): Promise<{ status: number; code?: string; message: string }> => {
+): Promise<{ status: number; code?: string; message: string; details?: ApiErrorPayload["details"] }> => {
   try {
     const payload = (await response.json()) as ApiErrorPayload;
     if (payload.code || payload.message) {
       return {
         status: response.status,
         code: payload.code,
-        message: payload.message ?? "Error en API."
+        message: payload.message ?? "Error en API.",
+        details: payload.details
       };
     }
   } catch {
@@ -350,7 +418,7 @@ const parseApiError = async (
 };
 
 const toActionableApiError = (
-  error: { status: number; code?: string; message: string },
+  error: { status: number; code?: string; message: string; details?: ApiErrorPayload["details"] },
   context: ErrorUxContext
 ): string => {
   const code = error.code ?? "ERROR";
@@ -373,7 +441,12 @@ const toActionableApiError = (
   }
 
   if (code === "UNPROCESSABLE_ENTITY" || error.status === 422) {
-    return "UNPROCESSABLE_ENTITY: Precondiciones no cumplidas. Revise bloqueos activos (alertas/NC) antes de reintentar.";
+    const reasons = error.details?.blockingReasons ?? [];
+    const detailText =
+      reasons.length > 0
+        ? ` Bloqueos: ${reasons.map((item) => `${item.type}:${item.title}`).join(" | ")}.`
+        : "";
+    return `UNPROCESSABLE_ENTITY: Precondiciones no cumplidas. Revise bloqueos activos (alertas/NC) antes de reintentar.${detailText}`;
   }
 
   if (code === "FORBIDDEN" || error.status === 403) {
@@ -391,34 +464,20 @@ const toActionableApiError = (
   return `${code}: ${error.message}`;
 };
 
-const fetchOperationalJson = async <T,>(
-  path: string,
-  bearerToken: string,
-  context: ErrorUxContext = "default"
-): Promise<T> => {
-  const normalized = bearerToken.trim();
-  if (!normalized) {
-    throw new Error("Debe ingresar access token para operar expedientes.");
-  }
-
-  const response = await fetch(`${OPERATIONAL_API_BASE_URL}${path}`, {
-    headers: {
-      Authorization: `Bearer ${normalized}`
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(toActionableApiError(await parseApiError(response), context));
-  }
-
-  return (await response.json()) as T;
-};
-
 function App() {
   const [token, setToken] = useState<string>(safeReadStoredToken());
   const [accessToken, setAccessToken] = useState<string>(safeReadStoredAccessToken());
-  const [authEmail, setAuthEmail] = useState<string>("admin@pac.local");
-  const [authPassword, setAuthPassword] = useState<string>("ChangeMe_123!");
+  const [refreshToken, setRefreshToken] = useState<string>(safeReadStoredRefreshToken());
+  const [authProfile, setAuthProfile] = useState<AuthProfile>(DEFAULT_AUTH_PROFILE);
+  const [authEmail, setAuthEmail] = useState<string>(
+    DEFAULT_AUTH_PROFILE === "QA" ? "admin@pac.local" : ""
+  );
+  const [authPassword, setAuthPassword] = useState<string>(
+    DEFAULT_AUTH_PROFILE === "QA" ? "ChangeMe_123!" : ""
+  );
+  const [accessTokenExpiresAt, setAccessTokenExpiresAt] = useState<number | null>(
+    decodeJwtExpMs(safeReadStoredAccessToken())
+  );
   const [authLoading, setAuthLoading] = useState<boolean>(false);
   const [authFeedback, setAuthFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -443,9 +502,15 @@ function App() {
   const [timelineLoading, setTimelineLoading] = useState<boolean>(false);
   const [timelineError, setTimelineError] = useState<string | null>(null);
 
+  const [inboxMode, setInboxMode] = useState<"filtros" | "ids">("filtros");
   const [expedientesInput, setExpedientesInput] = useState<string>(
     "35b2a855-ccfb-4c0e-a9d3-fdd92bbc1431, b84fb315-bf65-40d4-86ff-6e4a52149965, 0bfc8a5f-c6df-4b54-a2ec-443d89f59dc8"
   );
+  const [inboxQuery, setInboxQuery] = useState<string>("");
+  const [inboxEstadoGlobal, setInboxEstadoGlobal] = useState<string>("");
+  const [inboxResponsableUserId, setInboxResponsableUserId] = useState<string>("");
+  const [inboxPage, setInboxPage] = useState<number>(1);
+  const [inboxPageSize, setInboxPageSize] = useState<number>(20);
   const [expedienteInbox, setExpedienteInbox] = useState<ExpedienteInboxItem[]>([]);
   const [selectedExpedienteId, setSelectedExpedienteId] = useState<string>("");
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
@@ -469,6 +534,89 @@ function App() {
       params.set("ruleId", timelineRuleFilter);
     }
     return params.toString();
+  };
+
+  const setSessionTokens = (nextAccessToken: string, nextRefreshToken: string): void => {
+    const normalizedAccessToken = nextAccessToken.trim();
+    const normalizedRefreshToken = nextRefreshToken.trim();
+    setAccessToken(normalizedAccessToken);
+    setRefreshToken(normalizedRefreshToken);
+    setAccessTokenExpiresAt(decodeJwtExpMs(normalizedAccessToken));
+    safeStoreAccessToken(normalizedAccessToken);
+    safeStoreRefreshToken(normalizedRefreshToken);
+  };
+
+  const refreshOperationalSession = async (): Promise<string> => {
+    const currentRefreshToken = refreshToken.trim();
+    if (!currentRefreshToken) {
+      throw new Error("UNAUTHENTICATED: No hay refresh token disponible. Inicie sesion nuevamente.");
+    }
+
+    const response = await fetch(`${OPERATIONAL_API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        refreshToken: currentRefreshToken
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(toActionableApiError(await parseApiError(response), "default"));
+    }
+
+    const payload = (await response.json()) as {
+      accessToken: string;
+      refreshToken: string;
+    };
+    const nextAccessToken = payload.accessToken?.trim() ?? "";
+    const nextRefreshToken = payload.refreshToken?.trim() ?? "";
+    if (!nextAccessToken || !nextRefreshToken) {
+      throw new Error("UNAUTHENTICATED: Refresh sin tokens validos.");
+    }
+
+    setSessionTokens(nextAccessToken, nextRefreshToken);
+    setAuthFeedback("Sesion renovada automaticamente.");
+    return nextAccessToken;
+  };
+
+  const fetchOperationalJsonWithAuth = async <T,>(
+    path: string,
+    context: ErrorUxContext = "default",
+    options: RequestInit = {}
+  ): Promise<T> => {
+    const initialToken = accessToken.trim();
+    if (!initialToken) {
+      throw new Error("UNAUTHENTICATED: Debe iniciar sesion para operar expedientes.");
+    }
+
+    const requestWithToken = async (bearerToken: string): Promise<Response> =>
+      fetch(`${OPERATIONAL_API_BASE_URL}${path}`, {
+        ...options,
+        headers: {
+          ...(options.headers ?? {}),
+          Authorization: `Bearer ${bearerToken}`,
+          ...(options.body ? { "Content-Type": "application/json" } : {})
+        }
+      });
+
+    let response = await requestWithToken(initialToken);
+
+    if (response.status === 401) {
+      const renewedToken = await refreshOperationalSession();
+      response = await requestWithToken(renewedToken);
+    }
+
+    if (!response.ok) {
+      throw new Error(toActionableApiError(await parseApiError(response), context));
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return (await response.json()) as T;
   };
 
   const loadTimeline = async (metricsToken: string): Promise<void> => {
@@ -521,29 +669,24 @@ function App() {
 
   const loadExpedienteDetail = async (
     expedienteId: string,
-    bearerToken: string,
     scope: "all" | "global" | "stage" = historyScope
   ): Promise<void> => {
     setDetailLoading(true);
     setDetailError(null);
     setOperationalFeedback(null);
-    safeStoreAccessToken(bearerToken);
 
     try {
       const [summary, workflow, history] = await Promise.all([
-        fetchOperationalJson<ExpedienteSummary>(
+        fetchOperationalJsonWithAuth<ExpedienteSummary>(
           `/expedientes/${encodeURIComponent(expedienteId)}`,
-          bearerToken,
           "detail.summary"
         ),
-        fetchOperationalJson<WorkflowDetail>(
+        fetchOperationalJsonWithAuth<WorkflowDetail>(
           `/expedientes/${encodeURIComponent(expedienteId)}/workflow`,
-          bearerToken,
           "detail.workflow"
         ),
-        fetchOperationalJson<HistoryDetail>(
+        fetchOperationalJsonWithAuth<HistoryDetail>(
           `/expedientes/${encodeURIComponent(expedienteId)}/history?page=1&pageSize=20&scope=${scope}`,
-          bearerToken,
           "detail.history"
         )
       ]);
@@ -562,7 +705,7 @@ function App() {
     }
   };
 
-  const loadExpedienteInbox = async (rawIds: string, bearerToken: string): Promise<void> => {
+  const loadExpedienteInboxByIds = async (rawIds: string): Promise<void> => {
     const ids = parseExpedienteIds(rawIds);
     if (ids.length === 0) {
       setExpedienteInbox([]);
@@ -580,9 +723,8 @@ function App() {
     const resolved = await Promise.all(
       ids.map(async (id): Promise<ExpedienteInboxItem> => {
         try {
-          const summary = await fetchOperationalJson<ExpedienteSummary>(
+          const summary = await fetchOperationalJsonWithAuth<ExpedienteSummary>(
             `/expedientes/${encodeURIComponent(id)}`,
-            bearerToken,
             "inbox"
           );
           return {
@@ -605,7 +747,7 @@ function App() {
     setExpedienteInbox(resolved);
     const firstValid = resolved.find((item) => item.summary !== null);
     if (firstValid?.summary) {
-      await loadExpedienteDetail(firstValid.expedienteId, bearerToken, historyScope);
+      await loadExpedienteDetail(firstValid.expedienteId, historyScope);
     } else {
       setSelectedExpedienteId("");
       setSelectedSummary(null);
@@ -614,18 +756,81 @@ function App() {
     }
   };
 
+  const loadExpedienteInboxByFilters = async (): Promise<void> => {
+    setDetailError(null);
+    try {
+      const query = new URLSearchParams({
+        page: String(inboxPage),
+        pageSize: String(inboxPageSize)
+      });
+      if (inboxQuery.trim().length > 0) query.set("q", inboxQuery.trim());
+      if (inboxEstadoGlobal.trim().length > 0) query.set("estadoGlobal", inboxEstadoGlobal.trim());
+      if (inboxResponsableUserId.trim().length > 0) {
+        query.set("responsableUserId", inboxResponsableUserId.trim());
+      }
+
+      const list = await fetchOperationalJsonWithAuth<ExpedienteListResponse>(
+        `/expedientes?${query.toString()}`,
+        "inbox"
+      );
+
+      const items = list.items.map((summary) => ({
+        expedienteId: summary.expedienteId,
+        loading: false,
+        summary,
+        error: null
+      }));
+
+      setExpedienteInbox(items);
+      const firstValid = items.find((item) => item.summary !== null);
+      if (firstValid?.summary) {
+        await loadExpedienteDetail(firstValid.expedienteId, historyScope);
+      } else {
+        setSelectedExpedienteId("");
+        setSelectedSummary(null);
+        setSelectedWorkflow(null);
+        setSelectedStateHistory(null);
+      }
+    } catch (inboxError) {
+      setExpedienteInbox([]);
+      setSelectedExpedienteId("");
+      setSelectedSummary(null);
+      setSelectedWorkflow(null);
+      setSelectedStateHistory(null);
+      setDetailError(inboxError instanceof Error ? inboxError.message : "Error cargando bandeja operativa.");
+    }
+  };
+
+  const loadExpedienteInbox = async (): Promise<void> => {
+    if (inboxMode === "ids") {
+      await loadExpedienteInboxByIds(expedientesInput);
+      return;
+    }
+    await loadExpedienteInboxByFilters();
+  };
+
   const loginOperationalUser = async (): Promise<void> => {
     setAuthLoading(true);
     setAuthFeedback(null);
 
     try {
+      const normalizedEmail = authEmail.trim();
+      if (authProfile === "PROD" && (!normalizedEmail || !authPassword.trim())) {
+        throw new Error("INVALID_PAYLOAD: En perfil PROD debe ingresar credenciales explicitas.");
+      }
+      if (authProfile === "PROD" && normalizedEmail.toLowerCase() === "admin@pac.local") {
+        throw new Error(
+          "INVALID_PAYLOAD: Perfil PROD bloquea credenciales de validacion local. Use usuario productivo."
+        );
+      }
+
       const response = await fetch(`${OPERATIONAL_API_BASE_URL}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          email: authEmail.trim(),
+          email: normalizedEmail,
           password: authPassword
         })
       });
@@ -636,12 +841,12 @@ function App() {
 
       const payload = (await response.json()) as LoginResponse;
       const nextAccessToken = payload.tokens.accessToken?.trim() ?? "";
-      if (!nextAccessToken) {
+      const nextRefreshToken = payload.tokens.refreshToken?.trim() ?? "";
+      if (!nextAccessToken || !nextRefreshToken) {
         throw new Error("UNAUTHENTICATED: Login sin access token.");
       }
 
-      setAccessToken(nextAccessToken);
-      safeStoreAccessToken(nextAccessToken);
+      setSessionTokens(nextAccessToken, nextRefreshToken);
       setAuthFeedback("Sesion operativa iniciada. Token cargado automaticamente.");
       setAuthLoading(false);
     } catch (loginError) {
@@ -674,13 +879,26 @@ function App() {
         body: JSON.stringify(body)
       });
 
-      if (!response.ok) {
-        throw new Error(toActionableApiError(await parseApiError(response), context));
+      let finalResponse = response;
+      if (response.status === 401) {
+        const renewedToken = await refreshOperationalSession();
+        finalResponse = await fetch(`${OPERATIONAL_API_BASE_URL}${path}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${renewedToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(body)
+        });
+      }
+
+      if (!finalResponse.ok) {
+        throw new Error(toActionableApiError(await parseApiError(finalResponse), context));
       }
 
       setOperationalFeedback(successMessage);
-      await loadExpedienteInbox(expedientesInput, accessToken);
-      await loadExpedienteDetail(selectedExpedienteId, accessToken, historyScope);
+      await loadExpedienteInbox();
+      await loadExpedienteDetail(selectedExpedienteId, historyScope);
       setOperationalActionLoading(false);
     } catch (actionError) {
       setOperationalActionLoading(false);
@@ -705,8 +923,48 @@ function App() {
 
   useEffect(() => {
     if (!selectedExpedienteId || !accessToken.trim()) return;
-    void loadExpedienteDetail(selectedExpedienteId, accessToken, historyScope);
+    void loadExpedienteDetail(selectedExpedienteId, historyScope);
   }, [historyScope]);
+
+  useEffect(() => {
+    safeStoreAccessToken(accessToken);
+    setAccessTokenExpiresAt(decodeJwtExpMs(accessToken));
+  }, [accessToken]);
+
+  useEffect(() => {
+    safeStoreRefreshToken(refreshToken);
+  }, [refreshToken]);
+
+  useEffect(() => {
+    if (authProfile === "PROD") {
+      if (authEmail.trim().toLowerCase() === "admin@pac.local") setAuthEmail("");
+      if (authPassword === "ChangeMe_123!") setAuthPassword("");
+      return;
+    }
+
+    if (!authEmail.trim()) setAuthEmail("admin@pac.local");
+    if (!authPassword.trim()) setAuthPassword("ChangeMe_123!");
+  }, [authProfile]);
+
+  useEffect(() => {
+    if (uniqueReopenableStageOptions.length === 0) {
+      setReopenStageTarget("");
+      return;
+    }
+    if (!uniqueReopenableStageOptions.includes(reopenStageTarget)) {
+      setReopenStageTarget(uniqueReopenableStageOptions[0] ?? "");
+    }
+  }, [selectedWorkflow]);
+
+  useEffect(() => {
+    if (!accessToken.trim()) return;
+    if (!accessTokenExpiresAt) return;
+
+    const minutesLeft = Math.floor((accessTokenExpiresAt - Date.now()) / 60000);
+    if (minutesLeft > 2) return;
+
+    void refreshOperationalSession();
+  }, [accessTokenExpiresAt, accessToken, refreshToken]);
 
   const postAction = async (path: string, body: Record<string, unknown>, successMessage: string) => {
     setActionLoading(true);
@@ -740,6 +998,16 @@ function App() {
 
   const selectedTrendHistory = windowMode === "24h" ? data?.history24h : data?.history7d;
   const timelineTotalPages = Math.max(actionsTimeline?.totalPages ?? 1, eventsTimeline?.totalPages ?? 1);
+  const reopenableStageOptions = (selectedWorkflow?.etapas ?? [])
+    .filter((stage) =>
+      ["CERRADA", "RECHAZADA", "VENCIDA", "BLOQUEADA", "OBSERVADA"].includes(stage.estadoEtapa)
+    )
+    .map((stage) => stage.tipoEtapa);
+  const uniqueReopenableStageOptions = [...new Set(reopenableStageOptions)];
+  const tokenMinutesLeft =
+    accessTokenExpiresAt && Number.isFinite(accessTokenExpiresAt)
+      ? Math.max(0, Math.floor((accessTokenExpiresAt - Date.now()) / 60000))
+      : null;
 
   return (
     <main className="dashboard-shell">
@@ -1098,15 +1366,24 @@ function App() {
             className="expedientes-auth-form"
             onSubmit={(event) => {
               event.preventDefault();
-              void loadExpedienteInbox(expedientesInput, accessToken);
+              void loadExpedienteInbox();
             }}
           >
+            <label htmlFor="auth-profile">Perfil operativo</label>
+            <select
+              id="auth-profile"
+              value={authProfile}
+              onChange={(event) => setAuthProfile(event.target.value as AuthProfile)}
+            >
+              <option value="QA">QA</option>
+              <option value="PROD">PROD</option>
+            </select>
             <label htmlFor="auth-email">Email operativo</label>
             <input
               id="auth-email"
               value={authEmail}
               onChange={(event) => setAuthEmail(event.target.value)}
-              placeholder="admin@pac.local"
+              placeholder={authProfile === "QA" ? "admin@pac.local" : "usuario@empresa.com"}
               autoComplete="username"
             />
             <label htmlFor="auth-password">Password operativo</label>
@@ -1115,7 +1392,7 @@ function App() {
               type="password"
               value={authPassword}
               onChange={(event) => setAuthPassword(event.target.value)}
-              placeholder="password"
+              placeholder={authProfile === "QA" ? "password QA" : "password PROD"}
               autoComplete="current-password"
             />
             <button
@@ -1135,16 +1412,75 @@ function App() {
               placeholder="pegar access token JWT"
               autoComplete="off"
             />
-            <label htmlFor="expedientes-ids">Bandeja (IDs separados por coma)</label>
-            <input
-              id="expedientes-ids"
-              value={expedientesInput}
-              onChange={(event) => setExpedientesInput(event.target.value)}
-              placeholder="EXP-001, EXP-002, EXP-003"
-            />
+            <label htmlFor="inbox-mode">Modo de bandeja</label>
+            <select
+              id="inbox-mode"
+              value={inboxMode}
+              onChange={(event) => setInboxMode(event.target.value as "filtros" | "ids")}
+            >
+              <option value="filtros">Filtros operativos</option>
+              <option value="ids">IDs manuales</option>
+            </select>
+            {inboxMode === "filtros" ? (
+              <>
+                <label htmlFor="inbox-query">Filtro q (codigo/id/proyecto)</label>
+                <input
+                  id="inbox-query"
+                  value={inboxQuery}
+                  onChange={(event) => setInboxQuery(event.target.value)}
+                  placeholder="PAC-VERIF-001"
+                />
+                <label htmlFor="inbox-estado">estadoGlobal</label>
+                <input
+                  id="inbox-estado"
+                  value={inboxEstadoGlobal}
+                  onChange={(event) => setInboxEstadoGlobal(event.target.value)}
+                  placeholder="CONTROL"
+                />
+                <label htmlFor="inbox-responsable">responsableUserId</label>
+                <input
+                  id="inbox-responsable"
+                  value={inboxResponsableUserId}
+                  onChange={(event) => setInboxResponsableUserId(event.target.value)}
+                  placeholder="(opcional) UUID responsable"
+                />
+                <label htmlFor="inbox-page">page</label>
+                <input
+                  id="inbox-page"
+                  type="number"
+                  min={1}
+                  value={inboxPage}
+                  onChange={(event) => setInboxPage(Number(event.target.value) || 1)}
+                />
+                <label htmlFor="inbox-page-size">pageSize</label>
+                <input
+                  id="inbox-page-size"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={inboxPageSize}
+                  onChange={(event) => setInboxPageSize(Number(event.target.value) || 20)}
+                />
+              </>
+            ) : (
+              <>
+                <label htmlFor="expedientes-ids">Bandeja (IDs separados por coma)</label>
+                <input
+                  id="expedientes-ids"
+                  value={expedientesInput}
+                  onChange={(event) => setExpedientesInput(event.target.value)}
+                  placeholder="EXP-001, EXP-002, EXP-003"
+                />
+              </>
+            )}
             <button type="submit" disabled={detailLoading}>
               {detailLoading ? "Cargando..." : "Cargar bandeja"}
             </button>
+            {tokenMinutesLeft !== null ? (
+              <p className="session-status">
+                Sesion: expira en {tokenMinutesLeft} min {tokenMinutesLeft <= 2 ? "(renovacion activa)" : ""}
+              </p>
+            ) : null}
             {authFeedback ? <p className="action-feedback">{authFeedback}</p> : null}
           </form>
         </header>
@@ -1170,13 +1506,13 @@ function App() {
                     <td>{item.summary?.responsableActual?.fullName ?? "-"}</td>
                     <td>{item.summary?.bloqueos.count ?? "-"}</td>
                     <td>
-                      <button
-                        type="button"
-                        disabled={item.loading || !item.summary}
-                        onClick={() => void loadExpedienteDetail(item.expedienteId, accessToken)}
-                      >
-                        Abrir
-                      </button>
+                        <button
+                          type="button"
+                          disabled={item.loading || !item.summary}
+                          onClick={() => void loadExpedienteDetail(item.expedienteId)}
+                        >
+                          Abrir
+                        </button>
                     </td>
                   </tr>
                 ))}
@@ -1243,6 +1579,18 @@ function App() {
                       ))}
                     </tbody>
                   </table>
+                  {(selectedWorkflow?.blockingReasons?.length ?? 0) > 0 ? (
+                    <div className="inline-errors">
+                      <p>
+                        <strong>Bloqueos activos:</strong>
+                      </p>
+                      {selectedWorkflow?.blockingReasons.map((reason) => (
+                        <p key={reason.id}>
+                          [{reason.type}] {reason.title} ({reason.severity})
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
                 </section>
               </div>
             ) : null}
@@ -1341,11 +1689,20 @@ function App() {
               <h5>F5 · Reopen Stage</h5>
               <label>
                 etapa
-                <input
+                <select
                   value={reopenStageTarget}
                   onChange={(event) => setReopenStageTarget(event.target.value)}
-                  placeholder="REVISION_TECNICA"
-                />
+                >
+                  {uniqueReopenableStageOptions.length === 0 ? (
+                    <option value="">Sin etapas reabribles</option>
+                  ) : (
+                    uniqueReopenableStageOptions.map((etapa) => (
+                      <option key={etapa} value={etapa}>
+                        {etapa}
+                      </option>
+                    ))
+                  )}
+                </select>
               </label>
               <label>
                 motivo
@@ -1355,9 +1712,22 @@ function App() {
                   placeholder="Motivo de reapertura"
                 />
               </label>
-              <button type="submit" disabled={operationalActionLoading || !selectedExpedienteId}>
+              <button
+                type="submit"
+                disabled={
+                  operationalActionLoading ||
+                  !selectedExpedienteId ||
+                  uniqueReopenableStageOptions.length === 0 ||
+                  !reopenStageTarget
+                }
+              >
                 {operationalActionLoading ? "Ejecutando..." : "Ejecutar reopen-stage"}
               </button>
+              {uniqueReopenableStageOptions.length === 0 ? (
+                <p className="session-status">
+                  No hay etapas elegibles para reapertura (CERRADA|OBSERVADA|BLOQUEADA|VENCIDA|RECHAZADA).
+                </p>
+              ) : null}
             </form>
           </div>
           {operationalFeedback ? <p className="action-feedback">{operationalFeedback}</p> : null}
