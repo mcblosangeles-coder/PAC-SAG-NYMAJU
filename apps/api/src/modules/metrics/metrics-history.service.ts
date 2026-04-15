@@ -3,6 +3,7 @@ import { env } from "../../lib/env";
 import { logger } from "../../lib/logger";
 import {
   operationalMetricsService,
+  type MetricsProfile,
   type OperationalMetricCounters,
   type OperationalMetricsSnapshot
 } from "./operational-metrics.service";
@@ -18,7 +19,11 @@ type HistoricalMetricPoint = {
   count5xx: number;
 };
 
-const SOURCE = "api_internal";
+const SOURCE_BY_PROFILE: Record<MetricsProfile, string> = {
+  all: "api_internal_all",
+  operational: "api_internal_operational",
+  validation: "api_internal_validation"
+};
 const MS_PER_SECOND = 1_000;
 const MS_PER_MINUTE = 60_000;
 const MS_PER_DAY = 86_400_000;
@@ -85,14 +90,22 @@ const toDeltaCounters = (
   )
 });
 
-let lastPersistedCounters: DeltaCounters | null = null;
+const lastPersistedCountersByProfile: Record<MetricsProfile, DeltaCounters | null> = {
+  all: null,
+  operational: null,
+  validation: null
+};
 let collectorInterval: NodeJS.Timeout | null = null;
 
-const persistSnapshot = async (snapshot: OperationalMetricsSnapshot): Promise<void> => {
+const persistSnapshot = async (
+  profile: MetricsProfile,
+  snapshot: OperationalMetricsSnapshot
+): Promise<void> => {
+  const source = SOURCE_BY_PROFILE[profile];
   const now = new Date();
   const windowEnd = truncateToMinute(now);
   const windowStart = new Date(windowEnd.getTime() - env.metricsCollectorIntervalSeconds * MS_PER_SECOND);
-  const deltaCounters = toDeltaCounters(snapshot, lastPersistedCounters);
+  const deltaCounters = toDeltaCounters(snapshot, lastPersistedCountersByProfile[profile]);
 
   const errorRate = ratio(deltaCounters.requestsErrorTotal, deltaCounters.requestsTotal);
   const authRefreshFailedRate = ratio(
@@ -107,7 +120,7 @@ const persistSnapshot = async (snapshot: OperationalMetricsSnapshot): Promise<vo
   await prisma.operationalMetricSnapshot.upsert({
     where: {
       source_windowStart: {
-        source: SOURCE,
+        source,
         windowStart
       }
     },
@@ -127,7 +140,7 @@ const persistSnapshot = async (snapshot: OperationalMetricsSnapshot): Promise<vo
       workflow422Rate
     },
     create: {
-      source: SOURCE,
+      source,
       windowStart,
       windowEnd,
       requestsTotal: deltaCounters.requestsTotal,
@@ -148,14 +161,14 @@ const persistSnapshot = async (snapshot: OperationalMetricsSnapshot): Promise<vo
   const retentionCutoff = new Date(Date.now() - env.metricsRetentionDays * MS_PER_DAY);
   await prisma.operationalMetricSnapshot.deleteMany({
     where: {
-      source: SOURCE,
+      source,
       windowEnd: {
         lt: retentionCutoff
       }
     }
   });
 
-  lastPersistedCounters = {
+  lastPersistedCountersByProfile[profile] = {
     requestsTotal: snapshot.counters.requestsTotal,
     requestsErrorTotal: snapshot.counters.requestsErrorTotal,
     requests5xxTotal: snapshot.counters.requests5xxTotal,
@@ -168,8 +181,15 @@ const persistSnapshot = async (snapshot: OperationalMetricsSnapshot): Promise<vo
 };
 
 const collectOnce = async (): Promise<void> => {
-  const snapshot = operationalMetricsService.snapshot();
-  await persistSnapshot(snapshot);
+  const snapshots: Array<[MetricsProfile, OperationalMetricsSnapshot]> = [
+    ["all", operationalMetricsService.snapshot("all")],
+    ["operational", operationalMetricsService.snapshot("operational")],
+    ["validation", operationalMetricsService.snapshot("validation")]
+  ];
+
+  for (const [profile, snapshot] of snapshots) {
+    await persistSnapshot(profile, snapshot);
+  }
 };
 
 export const metricsHistoryService = {
@@ -211,11 +231,12 @@ export const metricsHistoryService = {
     logger.info("jobs.metrics_collector.stopped", "Metrics collector stopped.");
   },
 
-  async getHistoricalMetrics(window: HistoryWindow) {
+  async getHistoricalMetrics(window: HistoryWindow, profile: MetricsProfile = "operational") {
     const since = getWindowStart(window);
+    const source = SOURCE_BY_PROFILE[profile];
     const rows = await prisma.operationalMetricSnapshot.findMany({
       where: {
-        source: SOURCE,
+        source,
         windowStart: {
           gte: since
         }
@@ -239,6 +260,7 @@ export const metricsHistoryService = {
 
     return {
       window,
+      profile,
       since: since.toISOString(),
       now: new Date().toISOString(),
       points,

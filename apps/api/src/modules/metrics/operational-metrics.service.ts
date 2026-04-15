@@ -16,7 +16,11 @@ type HttpRequestMetricInput = {
   path: string;
   statusCode: number;
   durationMs: number;
+  trafficProfile: TrafficProfile;
 };
+
+export type TrafficProfile = "operational" | "validation";
+export type MetricsProfile = "all" | TrafficProfile;
 
 export type OperationalMetricCounters = {
   requestsTotal: number;
@@ -85,16 +89,42 @@ const evaluateThreshold = (value: number, threshold: ThresholdDefinition): boole
 };
 
 const state = {
-  startedAt: new Date().toISOString(),
-  requestsTotal: 0,
-  requestsErrorTotal: 0,
-  requests5xxTotal: 0,
-  authRefreshAttempts: 0,
-  authRefreshFailures: 0,
-  workflowChangeStateAttempts: 0,
-  workflowChangeState422: 0,
-  auditLogFailedCount: 0,
-  durationSamplesMs: [] as number[]
+  all: {
+    startedAt: new Date().toISOString(),
+    requestsTotal: 0,
+    requestsErrorTotal: 0,
+    requests5xxTotal: 0,
+    authRefreshAttempts: 0,
+    authRefreshFailures: 0,
+    workflowChangeStateAttempts: 0,
+    workflowChangeState422: 0,
+    auditLogFailedCount: 0,
+    durationSamplesMs: [] as number[]
+  },
+  operational: {
+    startedAt: new Date().toISOString(),
+    requestsTotal: 0,
+    requestsErrorTotal: 0,
+    requests5xxTotal: 0,
+    authRefreshAttempts: 0,
+    authRefreshFailures: 0,
+    workflowChangeStateAttempts: 0,
+    workflowChangeState422: 0,
+    auditLogFailedCount: 0,
+    durationSamplesMs: [] as number[]
+  },
+  validation: {
+    startedAt: new Date().toISOString(),
+    requestsTotal: 0,
+    requestsErrorTotal: 0,
+    requests5xxTotal: 0,
+    authRefreshAttempts: 0,
+    authRefreshFailures: 0,
+    workflowChangeStateAttempts: 0,
+    workflowChangeState422: 0,
+    auditLogFailedCount: 0,
+    durationSamplesMs: [] as number[]
+  }
 };
 
 const rate = (numerator: number, denominator: number): number => {
@@ -102,51 +132,67 @@ const rate = (numerator: number, denominator: number): number => {
   return round(numerator / denominator);
 };
 
-const pushDuration = (durationMs: number): void => {
+const pushDuration = (
+  target: {
+    durationSamplesMs: number[];
+  },
+  durationMs: number
+): void => {
   if (!Number.isFinite(durationMs) || durationMs < 0) return;
-  state.durationSamplesMs.push(durationMs);
-  if (state.durationSamplesMs.length > MAX_DURATION_SAMPLES) {
-    state.durationSamplesMs.shift();
+  target.durationSamplesMs.push(durationMs);
+  if (target.durationSamplesMs.length > MAX_DURATION_SAMPLES) {
+    target.durationSamplesMs.shift();
   }
+};
+
+const updateStateForRequest = (
+  target: typeof state.all,
+  input: Omit<HttpRequestMetricInput, "trafficProfile">
+): void => {
+  const pathname = toPathname(input.path);
+
+  target.requestsTotal += 1;
+  if (input.statusCode >= 400) target.requestsErrorTotal += 1;
+  if (input.statusCode >= 500) target.requests5xxTotal += 1;
+
+  if (REFRESH_PATH_REGEX.test(pathname)) {
+    target.authRefreshAttempts += 1;
+    if (input.statusCode >= 400) {
+      target.authRefreshFailures += 1;
+    }
+  }
+
+  if (CHANGE_STATE_PATH_REGEX.test(pathname)) {
+    target.workflowChangeStateAttempts += 1;
+    if (input.statusCode === 422) {
+      target.workflowChangeState422 += 1;
+    }
+  }
+
+  pushDuration(target, input.durationMs);
 };
 
 export const operationalMetricsService = {
   recordHttpRequest(input: HttpRequestMetricInput): void {
-    const pathname = toPathname(input.path);
-
-    state.requestsTotal += 1;
-    if (input.statusCode >= 400) state.requestsErrorTotal += 1;
-    if (input.statusCode >= 500) state.requests5xxTotal += 1;
-
-    if (REFRESH_PATH_REGEX.test(pathname)) {
-      state.authRefreshAttempts += 1;
-      if (input.statusCode >= 400) {
-        state.authRefreshFailures += 1;
-      }
-    }
-
-    if (CHANGE_STATE_PATH_REGEX.test(pathname)) {
-      state.workflowChangeStateAttempts += 1;
-      if (input.statusCode === 422) {
-        state.workflowChangeState422 += 1;
-      }
-    }
-
-    pushDuration(input.durationMs);
+    updateStateForRequest(state.all, input);
+    updateStateForRequest(state[input.trafficProfile], input);
   },
 
   recordAuditLogFailure(): void {
-    state.auditLogFailedCount += 1;
+    state.all.auditLogFailedCount += 1;
+    state.operational.auditLogFailedCount += 1;
+    state.validation.auditLogFailedCount += 1;
   },
 
-  snapshot(): OperationalMetricsSnapshot {
+  snapshot(profile: MetricsProfile = "all"): OperationalMetricsSnapshot {
+    const target = state[profile];
     const values = {
-      error_rate: rate(state.requestsErrorTotal, state.requestsTotal),
-      p95_latency: calculateP95(state.durationSamplesMs),
-      "5xx_count": state.requests5xxTotal,
-      auth_refresh_failed_rate: rate(state.authRefreshFailures, state.authRefreshAttempts),
-      audit_log_failed_count: state.auditLogFailedCount,
-      workflow_422_rate: rate(state.workflowChangeState422, state.workflowChangeStateAttempts)
+      error_rate: rate(target.requestsErrorTotal, target.requestsTotal),
+      p95_latency: calculateP95(target.durationSamplesMs),
+      "5xx_count": target.requests5xxTotal,
+      auth_refresh_failed_rate: rate(target.authRefreshFailures, target.authRefreshAttempts),
+      audit_log_failed_count: target.auditLogFailedCount,
+      workflow_422_rate: rate(target.workflowChangeState422, target.workflowChangeStateAttempts)
     };
 
     const statusByMetric = Object.fromEntries(
@@ -173,18 +219,18 @@ export const operationalMetricsService = {
       .map(([metric]) => metric);
 
     return {
-      startedAt: state.startedAt,
+      startedAt: target.startedAt,
       now: new Date().toISOString(),
       counters: {
-        requestsTotal: state.requestsTotal,
-        requestsErrorTotal: state.requestsErrorTotal,
-        requests5xxTotal: state.requests5xxTotal,
-        authRefreshAttempts: state.authRefreshAttempts,
-        authRefreshFailures: state.authRefreshFailures,
-        workflowChangeStateAttempts: state.workflowChangeStateAttempts,
-        workflowChangeState422: state.workflowChangeState422,
-        auditLogFailedCount: state.auditLogFailedCount,
-        durationSampleCount: state.durationSamplesMs.length
+        requestsTotal: target.requestsTotal,
+        requestsErrorTotal: target.requestsErrorTotal,
+        requests5xxTotal: target.requests5xxTotal,
+        authRefreshAttempts: target.authRefreshAttempts,
+        authRefreshFailures: target.authRefreshFailures,
+        workflowChangeStateAttempts: target.workflowChangeStateAttempts,
+        workflowChangeState422: target.workflowChangeState422,
+        auditLogFailedCount: target.auditLogFailedCount,
+        durationSampleCount: target.durationSamplesMs.length
       },
       metrics: statusByMetric,
       summary: {

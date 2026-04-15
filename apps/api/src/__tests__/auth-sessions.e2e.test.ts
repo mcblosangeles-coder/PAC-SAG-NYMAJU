@@ -16,6 +16,13 @@ process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? "test_refresh
 process.env.JWT_ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN ?? "15m";
 process.env.JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN ?? "7d";
 
+const originalFetch = globalThis.fetch;
+const fetchWithValidationProfile: typeof fetch = (input, init) => {
+  const headers = new Headers(init?.headers);
+  headers.set("x-traffic-profile", "validation");
+  return originalFetch(input, { ...init, headers });
+};
+
 const TEST_USER_EMAIL = "m3b3.session@pac.local";
 const TEST_USER_PASSWORD = "M3B3_Session_123!";
 
@@ -52,6 +59,7 @@ describe("Auth session security (M3-B3)", async () => {
   let testUserId = "";
 
   before(async () => {
+    globalThis.fetch = fetchWithValidationProfile;
     server = app.listen(0);
     await new Promise<void>((resolve) => {
       server.on("listening", () => resolve());
@@ -64,6 +72,7 @@ describe("Auth session security (M3-B3)", async () => {
   });
 
   after(async () => {
+    globalThis.fetch = originalFetch;
     await prisma.$disconnect();
     await new Promise<void>((resolve, reject) => {
       server.close((err) => {

@@ -13,6 +13,13 @@ process.env.DATABASE_URL =
 process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET ?? "test_access_secret";
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? "test_refresh_secret";
 
+const originalFetch = globalThis.fetch;
+const fetchWithValidationProfile: typeof fetch = (input, init) => {
+  const headers = new Headers(init?.headers);
+  headers.set("x-traffic-profile", "validation");
+  return originalFetch(input, { ...init, headers });
+};
+
 type SecurityDeps = {
   permissionsService: {
     hasPermission: (userId: string, permissionCode: string) => Promise<boolean>;
@@ -231,6 +238,7 @@ describe("Auth + RBAC middleware integration", async () => {
   let baseUrl = "";
 
   before(async () => {
+    globalThis.fetch = fetchWithValidationProfile;
     server = app.listen(0);
     await new Promise<void>((resolve) => {
       server.on("listening", () => resolve());
@@ -243,6 +251,7 @@ describe("Auth + RBAC middleware integration", async () => {
   });
 
   after(async () => {
+    globalThis.fetch = originalFetch;
     await new Promise<void>((resolve, reject) => {
       server.close((err) => {
         if (err) reject(err);

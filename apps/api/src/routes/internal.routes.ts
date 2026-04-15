@@ -6,6 +6,7 @@ import { createRateLimitMiddleware } from "../middlewares/rate-limit";
 import { operationalAlertsService } from "../modules/metrics/operational-alerts.service";
 import { metricsHistoryService } from "../modules/metrics/metrics-history.service";
 import { operationalMetricsService } from "../modules/metrics/operational-metrics.service";
+import type { MetricsProfile } from "../modules/metrics/operational-metrics.service";
 
 export const internalRouter: Router = Router();
 const MAX_PAGE_SIZE = 100;
@@ -43,9 +44,26 @@ const parsePagination = (req: Request): { page: number; pageSize: number } => {
   return { page, pageSize };
 };
 
+const parseMetricsProfile = (req: Request): MetricsProfile | null => {
+  const raw = String(req.query.profile ?? "operational").toLowerCase();
+  if (raw === "all" || raw === "operational" || raw === "validation") {
+    return raw;
+  }
+  return null;
+};
+
 internalRouter.get("/metrics", (req, res) => {
   if (!ensureMetricsAccess(req, res)) return;
-  return res.status(200).json(operationalMetricsService.snapshot());
+  const profile = parseMetricsProfile(req);
+  if (!profile) {
+    return sendApiError(
+      res,
+      400,
+      API_ERROR_CODE.invalidParam,
+      "Parametro profile invalido. Use all, operational o validation."
+    );
+  }
+  return res.status(200).json(operationalMetricsService.snapshot(profile));
 });
 
 internalRouter.get("/metrics/history", async (req, res) => {
@@ -60,9 +78,21 @@ internalRouter.get("/metrics/history", async (req, res) => {
       "Parametro window invalido. Use 24h o 7d."
     );
   }
+  const profile = parseMetricsProfile(req);
+  if (!profile) {
+    return sendApiError(
+      res,
+      400,
+      API_ERROR_CODE.invalidParam,
+      "Parametro profile invalido. Use all, operational o validation."
+    );
+  }
 
   try {
-    const history = await metricsHistoryService.getHistoricalMetrics(rawWindow as "24h" | "7d");
+    const history = await metricsHistoryService.getHistoricalMetrics(
+      rawWindow as "24h" | "7d",
+      profile
+    );
     return res.status(200).json(history);
   } catch (error) {
     logger.error("db.metrics_history.read_failed", "Failed to read metrics history.", error, {
@@ -74,12 +104,31 @@ internalRouter.get("/metrics/history", async (req, res) => {
 
 internalRouter.get("/alerts/operational", (req, res) => {
   if (!ensureMetricsAccess(req, res)) return;
+  const profile = parseMetricsProfile(req);
+  if (!profile) {
+    return sendApiError(
+      res,
+      400,
+      API_ERROR_CODE.invalidParam,
+      "Parametro profile invalido. Use all, operational o validation."
+    );
+  }
+  void operationalAlertsService.evaluateNow(profile);
   return res.status(200).json(operationalAlertsService.status());
 });
 
 internalRouter.post("/alerts/operational/evaluate", async (req, res) => {
   if (!ensureMetricsAccess(req, res)) return;
-  await operationalAlertsService.evaluateNow();
+  const profile = parseMetricsProfile(req);
+  if (!profile) {
+    return sendApiError(
+      res,
+      400,
+      API_ERROR_CODE.invalidParam,
+      "Parametro profile invalido. Use all, operational o validation."
+    );
+  }
+  await operationalAlertsService.evaluateNow(profile);
   return res.status(200).json(operationalAlertsService.status());
 });
 

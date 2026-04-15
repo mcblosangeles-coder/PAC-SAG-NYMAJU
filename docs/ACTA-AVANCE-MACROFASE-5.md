@@ -339,3 +339,38 @@ Estado:
 ## Siguiente bloque
 
 Iniciar `M5-F1` (endurecimiento de lectura operativa de alertas historicas y preparacion de salida controlada siguiente).
+
+## Cierre M5-F1 (separacion de señal operativa)
+
+Fecha cierre: 2026-04-15
+
+Se ejecuta endurecimiento de lectura operativa separando señal de monitoreo por perfil de trafico:
+
+1. `operational` (operacion real)
+2. `validation` (pruebas/QA/UAT)
+3. `all` (vista agregada)
+
+### Entregable
+
+1. `docs/M5-F1-SEPARACION-SENAL-OPERATIVA.md`
+
+### Resultado
+
+1. API instrumentada con `x-traffic-profile` y fallback por entorno.
+2. Metrics in-memory y historicas separadas por perfil/fuente.
+3. Endpoints internos de metrics/alerts soportan filtro `profile`.
+4. E2E marca trafico de prueba como `validation` para no contaminar lectura operacional.
+
+### Evidencia tecnica
+
+1. `pnpm.cmd --filter @pac/api typecheck` -> OK.
+2. `pnpm.cmd --filter @pac/api test:e2e` -> OK (`45/45`).
+3. Logs e2e confirman `trafficProfile: validation`.
+
+Estado:
+
+- M5-F1: **CERRADO (IMPLEMENTADO + VALIDADO)**.
+
+## Siguiente bloque
+
+Preparar `M5-F2` para salida controlada siguiente (afinamiento de umbrales y operacion sobre perfil `operational`).

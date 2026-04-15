@@ -12,6 +12,13 @@ process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET ?? "test_access_se
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? "test_refresh_secret";
 process.env.METRICS_TOKEN = process.env.METRICS_TOKEN ?? "metrics_test_token";
 
+const originalFetch = globalThis.fetch;
+const fetchWithValidationProfile: typeof fetch = (input, init) => {
+  const headers = new Headers(init?.headers);
+  headers.set("x-traffic-profile", "validation");
+  return originalFetch(input, { ...init, headers });
+};
+
 type MetricsResponse = {
   counters: Record<string, number>;
   metrics: Partial<Record<string, { value: number; isWithinThreshold: boolean }>>;
@@ -67,6 +74,7 @@ describe("Internal metrics endpoint", async () => {
   let baseUrl = "";
 
   before(async () => {
+    globalThis.fetch = fetchWithValidationProfile;
     server = app.listen(0);
     await new Promise<void>((resolve) => {
       server.on("listening", () => resolve());
@@ -79,6 +87,7 @@ describe("Internal metrics endpoint", async () => {
   });
 
   after(async () => {
+    globalThis.fetch = originalFetch;
     await new Promise<void>((resolve, reject) => {
       server.close((err) => {
         if (err) reject(err);
@@ -130,6 +139,16 @@ describe("Internal metrics endpoint", async () => {
     assert.equal(response.status, 400);
   });
 
+  it("returns 400 when profile is invalid", async () => {
+    const response = await fetch(
+      `${baseUrl}/api/v1/internal/metrics/history?window=24h&profile=invalid_profile`,
+      {
+        headers: { "x-metrics-token": process.env.METRICS_TOKEN as string }
+      }
+    );
+    assert.equal(response.status, 400);
+  });
+
   it("returns 200 in history endpoint for 24h window", async () => {
     const response = await fetch(`${baseUrl}/api/v1/internal/metrics/history?window=24h`, {
       headers: { "x-metrics-token": process.env.METRICS_TOKEN as string }
@@ -142,6 +161,21 @@ describe("Internal metrics endpoint", async () => {
     assert.equal(typeof body.summary.errorRate, "number");
     assert.equal(typeof body.summary.p95Latency, "number");
     assert.equal(typeof body.summary.count5xx, "number");
+  });
+
+  it("returns 200 in history endpoint for validation profile", async () => {
+    const response = await fetch(
+      `${baseUrl}/api/v1/internal/metrics/history?window=24h&profile=validation`,
+      {
+        headers: { "x-metrics-token": process.env.METRICS_TOKEN as string }
+      }
+    );
+
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as MetricsHistoryResponse & { profile?: string };
+    assert.equal(body.window, "24h");
+    assert.equal(body.profile, "validation");
+    assert.equal(Array.isArray(body.points), true);
   });
 
   it("returns 403 in operational alerts status when metrics token is missing", async () => {

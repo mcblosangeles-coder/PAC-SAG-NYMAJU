@@ -6,7 +6,10 @@ import type { HealthStatus } from "@pac/shared-types";
 import { env } from "./lib/env";
 import { API_ERROR_CODE, sendApiError } from "./lib/api-error";
 import { logger } from "./lib/logger";
-import { operationalMetricsService } from "./modules/metrics/operational-metrics.service";
+import {
+  operationalMetricsService,
+  type TrafficProfile
+} from "./modules/metrics/operational-metrics.service";
 import { authRouter } from "./modules/auth/auth.routes";
 import { expedientesRouter } from "./routes/expedientes.routes";
 import { internalRouter } from "./routes/internal.routes";
@@ -25,6 +28,15 @@ const resolveRequestId = (requestIdHeader: string | undefined): string => {
   }
 
   return normalized;
+};
+
+const resolveTrafficProfile = (
+  rawHeader: string | undefined
+): TrafficProfile => {
+  const normalized = rawHeader?.trim().toLowerCase();
+  if (normalized === "validation") return "validation";
+  if (normalized === "operational") return "operational";
+  return env.nodeEnv === "test" ? "validation" : "operational";
 };
 
 export const createApp = (): express.Express => {
@@ -73,13 +85,16 @@ export const createApp = (): express.Express => {
   app.use((req, res, next) => {
     const startedAt = process.hrtime.bigint();
     const requestId = resolveRequestId(req.header("x-request-id") ?? undefined);
+    const trafficProfile = resolveTrafficProfile(req.header("x-traffic-profile") ?? undefined);
     res.setHeader("x-request-id", requestId);
     res.locals.requestId = requestId;
+    res.locals.trafficProfile = trafficProfile;
 
     logger.info("http.request.started", "Incoming API request.", {
       requestId,
       method: req.method,
-      path: req.originalUrl
+      path: req.originalUrl,
+      trafficProfile
     });
 
     res.on("finish", () => {
@@ -91,7 +106,8 @@ export const createApp = (): express.Express => {
       operationalMetricsService.recordHttpRequest({
         path,
         statusCode: res.statusCode,
-        durationMs: normalizedDurationMs
+        durationMs: normalizedDurationMs,
+        trafficProfile
       });
 
       logger.info("http.request.completed", "API request completed.", {
@@ -99,7 +115,8 @@ export const createApp = (): express.Express => {
         method: req.method,
         path,
         statusCode: res.statusCode,
-        durationMs: normalizedDurationMs
+        durationMs: normalizedDurationMs,
+        trafficProfile
       });
     });
 

@@ -4,6 +4,7 @@ import { env } from "../../lib/env";
 import { logger } from "../../lib/logger";
 import { auditService } from "../audit/audit.service";
 import { METRIC_THRESHOLDS } from "./operational-metrics.service";
+import type { MetricsProfile } from "./operational-metrics.service";
 import { metricsHistoryService } from "./metrics-history.service";
 
 type RuleSeverity = "warning" | "critical";
@@ -124,6 +125,7 @@ let evaluatorInterval: NodeJS.Timeout | null = null;
 let lastEvaluationAt: string | null = null;
 let lastEvaluationStatus: "ok" | "degraded" | "insufficient_data" | "error" = "insufficient_data";
 let lastEvaluationMessage = "Sin evaluaciones ejecutadas.";
+let lastEvaluationProfile: MetricsProfile = "operational";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -345,15 +347,16 @@ const applyRule = async (
 };
 
 export const operationalAlertsService = {
-  async evaluateNow(): Promise<void> {
+  async evaluateNow(profile: MetricsProfile = "operational"): Promise<void> {
     try {
-      const history = await metricsHistoryService.getHistoricalMetrics("24h");
+      const history = await metricsHistoryService.getHistoricalMetrics("24h", profile);
       const summary = history.summary;
       lastEvaluationAt = nowIso();
+      lastEvaluationProfile = profile;
 
       if (summary.samples < MIN_SAMPLES_FOR_EVALUATION) {
-        lastEvaluationStatus = "insufficient_data";
-        lastEvaluationMessage = `Datos insuficientes para evaluar alertas (samples=${summary.samples}).`;
+      lastEvaluationStatus = "insufficient_data";
+      lastEvaluationMessage = `Datos insuficientes para evaluar alertas (samples=${summary.samples}, profile=${profile}).`;
         return;
       }
 
@@ -362,10 +365,11 @@ export const operationalAlertsService = {
       lastEvaluationStatus = breached > 0 ? "degraded" : "ok";
       lastEvaluationMessage =
         breached > 0
-          ? `Alertas activas: ${breached}/${rules.length}.`
-          : "Sin alertas activas en evaluacion 24h.";
+          ? `Alertas activas: ${breached}/${rules.length} (profile=${profile}).`
+          : `Sin alertas activas en evaluacion 24h (profile=${profile}).`;
     } catch (error) {
       lastEvaluationAt = nowIso();
+      lastEvaluationProfile = profile;
       lastEvaluationStatus = "error";
       lastEvaluationMessage = "Error evaluando alertas operativas.";
       logger.error(
@@ -383,9 +387,9 @@ export const operationalAlertsService = {
     }
     if (evaluatorInterval) return;
 
-    void this.evaluateNow();
+    void this.evaluateNow("operational");
     evaluatorInterval = setInterval(() => {
-      void this.evaluateNow();
+      void this.evaluateNow("operational");
     }, env.alertsEvaluatorIntervalSeconds * MS_PER_SECOND);
 
     logger.info("jobs.alerts_evaluator.started", "Operational alerts evaluator started.", {
@@ -550,6 +554,7 @@ export const operationalAlertsService = {
       intervalSeconds: env.alertsEvaluatorIntervalSeconds,
       cooldownSeconds: env.alertsNotificationCooldownSeconds,
       channels: env.alertsNotifyChannels,
+      profile: lastEvaluationProfile,
       lastEvaluationAt,
       lastEvaluationStatus,
       lastEvaluationMessage,
