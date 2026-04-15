@@ -87,21 +87,21 @@ Accion:
 5. accion correctiva aplicada,
 6. resultado final.
 
-## Pendiente no bloqueante activo (controlado)
+## Pendiente no bloqueante (estado final)
 
 ID: `PNB-M4-B1-F5-200`
 
-Estado: ABIERTO (no bloqueante)
+Estado: CERRADO
 
-Contexto:
-1. En validacion funcional M4-B1 se verifico manejo correcto de error F5 (`409 CONFLICT`).
-2. Falta evidencia dirigida de camino positivo `200` para `reopen-stage` por dataset local no reabrible.
+Contexto de cierre:
+1. Se ejecuto seed de dataset M4.
+2. Se corrio prueba dirigida de F5 sobre `PAC-VERIF-001`.
+3. Se obtuvo respuesta `200` con transicion `CERRADA -> REABIERTA`.
 
-Plan de cierre operativo:
-1. crear expediente semilla con etapa en estado reabrible,
-2. ejecutar prueba dirigida `POST /expedientes/:id/reopen-stage` con resultado `200`,
-3. adjuntar captura UI + salida API en acta,
-4. cerrar pendiente sin reabrir bloque M4-B1.
+Evidencia:
+1. Endpoint: `POST /api/v1/expedientes/35b2a855-ccfb-4c0e-a9d3-fdd92bbc1431/reopen-stage`.
+2. Payload: `etapa=REVISION_TECNICA`, `motivo=Cierre pendiente PNB-M4-B1-F5-200`.
+3. Respuesta: `200`, `estadoAnterior=CERRADA`, `estadoNuevo=REABIERTA`.
 
 ## Escalamiento
 

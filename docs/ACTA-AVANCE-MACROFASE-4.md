@@ -415,3 +415,26 @@ Resultado:
 1. Contrato funcional y runbook quedan alineados al comportamiento real observado en validacion M4-B1/M4-B2.
 2. Se mantiene continuidad operativa sin frenar avance por el pendiente no bloqueante.
 3. M4-C1 (iteracion 2026-04-15): CERRADO Y VALIDADO.
+
+## Cierre del pendiente no bloqueante `PNB-M4-B1-F5-200`
+
+Fecha cierre: 2026-04-15
+
+Ejecucion:
+
+1. `pnpm.cmd db:seed` para restaurar dataset M4 de validacion.
+2. Prueba dirigida de F5 sobre expediente `35b2a855-ccfb-4c0e-a9d3-fdd92bbc1431`:
+- endpoint: `POST /api/v1/expedientes/:id/reopen-stage`
+- payload: `etapa=REVISION_TECNICA`, `motivo=Cierre pendiente PNB-M4-B1-F5-200`.
+
+Resultado:
+
+1. Respuesta `200`.
+2. Evidencia de payload:
+- `estadoAnterior=CERRADA`
+- `estadoNuevo=REABIERTA`
+- `message=Etapa reabierta correctamente.`
+
+Estado final:
+
+- `PNB-M4-B1-F5-200`: CERRADO.

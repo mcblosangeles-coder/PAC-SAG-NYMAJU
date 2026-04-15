@@ -53,9 +53,10 @@ Se considera MacroFase 4 cerrada cuando:
 
 > Escala: Critico / Alto / Medio / Bajo
 
-1. **Medio** - Camino `200` de F5 (`reopen-stage`) no evidenciado en expediente de validacion utilizado.
-- Impacto: cobertura funcional completa de F5 condicionada al dataset.
-- Mitigacion: preparar expediente semilla con etapa objetivo reabrible y ejecutar evidencia controlada de `200`.
+1. **Bajo (controlado)** - Riesgo historico F5 (`reopen-stage`) por falta de evidencia `200`.
+- Estado: mitigado y cerrado con prueba dirigida en `PAC-VERIF-001`.
+- Impacto residual: bajo, limitado a mantener dataset semilla en futuras corridas.
+- Mitigacion: conservar seed validado M4 y ejecutar prueba dirigida F5 en checklist de regresion.
 
 2. **Medio** - Dependencia de token manual en UI operativa para pruebas MVP.
 - Impacto: friccion operativa en validaciones manuales.
@@ -69,20 +70,22 @@ Se considera MacroFase 4 cerrada cuando:
 
 ID de control: `PNB-M4-B1-F5-200`
 
-Estado: ABIERTO (no bloqueante)
+Estado: CERRADO
 
-Detalle:
-1. Se valida correctamente manejo de error F5 (`409 CONFLICT`) en UI/API.
-2. Permanece pendiente evidencia dirigida de camino `200` para `reopen-stage` en entorno local actual.
+Detalle de cierre:
+1. Se ejecuto `pnpm.cmd db:seed` para restaurar dataset M4.
+2. Se corrio prueba dirigida:
+- `POST /api/v1/expedientes/35b2a855-ccfb-4c0e-a9d3-fdd92bbc1431/reopen-stage`
+- payload: `etapa=REVISION_TECNICA`, `motivo=Cierre pendiente PNB-M4-B1-F5-200`.
+3. Resultado confirmado:
+- HTTP `200`,
+- `estadoAnterior=CERRADA`,
+- `estadoNuevo=REABIERTA`,
+- `message=Etapa reabierta correctamente.`
 
-Plan de cierre operativo:
-1. Dueno: Backend/Data.
-2. Fecha objetivo: 2026-04-16.
-3. Acciones:
-- crear expediente semilla con etapa en estado reabrible,
-- ejecutar prueba dirigida F5 `200`,
-- anexar evidencia de UI/API en acta de avance,
-- cerrar `PNB-M4-B1-F5-200` sin reabrir el bloque M4-B1 completo.
+Conclusión:
+1. Se completa evidencia positiva de F5 (`200`) sin reabrir M4-B1.
+2. El riesgo residual asociado a este pendiente se considera cerrado.
 
 ## 4) Handoff a siguiente macrofase
 
@@ -105,12 +108,11 @@ Entregar una base MVP funcional trazable, con contrato y operacion documentada, 
 1. Ejecutar paquete de verificacion base:
 - `pnpm.cmd --filter @pac/api test:e2e`
 - `pnpm.cmd --filter @pac/web build`
-2. Completar cierre del pendiente `PNB-M4-B1-F5-200` (evidencia de camino `200` en F5).
-3. Definir backlog de refinamiento UX/operacion sobre base M4 cerrada.
+2. Definir backlog de refinamiento UX/operacion sobre base M4 cerrada.
 
 ## 5) Decision de cierre
 
 MacroFase 4 queda **CERRADA FORMALMENTE**, con criterio de salida cumplido, riesgos residuales documentados y handoff listo para continuidad.
 
 Nota de gobierno:
-- El pendiente `PNB-M4-B1-F5-200` queda expresamente clasificado como no bloqueante y con plan de cierre trazable.
+- El pendiente `PNB-M4-B1-F5-200` queda cerrado con evidencia tecnica trazable.

@@ -95,3 +95,24 @@ ID: `PNB-M4-B1-F5-200`
 - evidencia de `200` registrada y verificada,
 - acta actualizada marcando `PNB-M4-B1-F5-200` como `CERRADO`,
 - sin reabrir el bloque M4-B1 completo.
+
+## Cierre de pendiente `PNB-M4-B1-F5-200` (2026-04-15)
+
+Ejecucion realizada:
+
+1. `pnpm.cmd db:seed` para restaurar dataset M4 con etapa reabrible.
+2. Prueba dirigida sobre:
+- `POST /api/v1/expedientes/35b2a855-ccfb-4c0e-a9d3-fdd92bbc1431/reopen-stage`
+- payload: `etapa=REVISION_TECNICA`, `motivo=Cierre pendiente PNB-M4-B1-F5-200`.
+
+Resultado observado:
+
+1. Respuesta `200`.
+2. Payload confirmado:
+- `estadoAnterior=CERRADA`
+- `estadoNuevo=REABIERTA`
+- `message=Etapa reabierta correctamente.`
+
+Estado final:
+
+- `PNB-M4-B1-F5-200`: CERRADO.
